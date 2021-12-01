@@ -132,6 +132,7 @@ void meat(FILE *fp) {
   }
 
   printf("\n");
+/**
   printf("d: %d\n", getVar("d"));
   printf("e: %d\n", getVar("e"));
   printf("f: %d\n", getVar("f"));
@@ -140,13 +141,76 @@ void meat(FILE *fp) {
   printf("i: %d\n", getVar("i"));
   printf("x: %d\n", getVar("x"));
   printf("y: %d\n", getVar("y"));
+**/
 }
 
 int main( int argc, char *argv[] ) {
   char * filename = argv[1];
   FILE *fp;
-  fp = fopen(filename, "r");
 
+  fp = fopen(filename, "r");
   meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
+  fp = fopen(filename, "r");
+  meat(fp);
+  printf("a: %d\n", getVar("a"));
+
 }
 
