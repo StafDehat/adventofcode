@@ -34,13 +34,35 @@ def print_r(lst):
 def getVentCoords(ventDict):
   coordList = []
   if ventDict["x1"] == ventDict["x2"]:
+    # X is constant - it's a vertical line
     for y in range(min(ventDict["y1"],ventDict["y2"]),
                    max(ventDict["y1"],ventDict["y2"])+1):
       coordList.append({"x":ventDict["x1"], "y":y})
-  else:
+  elif ventDict["y1"] == ventDict["y2"]:
+    # Y is constant - it's a horizontal line
     for x in range(min(ventDict["x1"],ventDict["x2"]),
                    max(ventDict["x1"],ventDict["x2"])+1):
       coordList.append({"x":x, "y":ventDict["y1"]})
+  else:
+    # Must be a diagonal
+    minX = min(ventDict["x1"],ventDict["x2"])
+    maxX = max(ventDict["x1"],ventDict["x2"])
+    lineLength = maxX - minX
+    if ventDict["x1"] < ventDict["x2"]:
+      xSlope = 1
+    else:
+      xSlope = -1
+    #end if
+    if ventDict["y1"] < ventDict["y2"]:
+      ySlope = 1
+    else:
+      ySlope = -1
+    #end if
+    #runningX = ventDict["x1"]
+    #runningY = ventDict["y1"]
+    for i in range(0,lineLength+1):
+      coordList.append({"x":ventDict["x1"]+ (i*xSlope),
+                        "y":ventDict["y1"]+ (i*ySlope)})
   return coordList
 #end getVentCoords()
 
@@ -60,15 +82,6 @@ for line in lines:
   ventEntry["x2"] = int(coord2.split(',')[0])
   ventEntry["y2"] = int(coord2.split(',')[1])
   ventDicts.append(ventEntry)
-#end for
-
-# Strip diagonals
-for i in reversed( range(0,len(ventDicts)) ):
-  if ventDicts[i]["x1"] == ventDicts[i]["x2"]:
-    continue
-  if ventDicts[i]["y1"] == ventDicts[i]["y2"]:
-    continue
-  del ventDicts[i]
 #end for
 
 # Tally the vents on a coordinate-based "grid", of sorts
