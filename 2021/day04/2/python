@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
   
 import sys
-import collections
 
 # Debug function
 def debug(output):
@@ -68,14 +67,16 @@ def isWinner(board, called):
   for row in board:
     sum = 0
     for num in row:
-      sum += called[num]
+      if num in called:
+        sum += 1
     if sum >= 5:
       return True
   # end for-row
   for colNum in range(0,5):
     sum = 0
     for num in list(map(create_getXthItem(colNum),board)):
-      sum += called[num]
+      if num in called:
+        sum += 1
     if sum >= 5:
       return True
   #end for-col
@@ -94,7 +95,7 @@ def getScore(board, called, lastCall):
   sum = 0
   for row in board:
     for num in row:
-      if called[num] == 0:
+      if num not in called:
         sum += num
         debug("Not called: " + str(num) + " (sum=" + str(sum) + ")")
       else:
@@ -109,7 +110,6 @@ def getScore(board, called, lastCall):
 #
 # callList is now a list of ints
 callList = [int(x) for x in lines[0].split(',')]
-called = collections.Counter()
 # Build the list of boards
 boards = []
 linePtr = 1
@@ -123,19 +123,13 @@ while True:
 
 #
 # Play the game
-callPtr = 0
 # Call 5 numbers before we bother checking for winners:
-while callPtr < 5:
-  called[callList[callPtr]] = 1
-  callPtr += 1
-# end while
+callPtr = 4
 while callPtr < len(callList):
   thisNum = callList[callPtr]
-  # Record that thisNum was called
-  called[thisNum] = 1
   # Delete winning boards
   for index in reversed(range(0, len(boards))):
-    if isWinner(boards[index], called):
+    if isWinner(boards[index], set(callList[0:callPtr+1])):
       del boards[index]
   #end for
   if len(boards) <= 1:
@@ -150,15 +144,14 @@ loser = boards[0]
 # But what will its score be, when it does eventually win?
 while callPtr < len(callList):
   thisNum = callList[callPtr]
-  called[thisNum] = 1
-  if isWinner(loser, called):
+  if isWinner(loser, set(callList[0:callPtr+1])):
     break
   callPtr += 1
 #end while
 
 #
 # Score the losing board
-score = getScore(loser, called, callList[callPtr])
+score = getScore(loser, set(callList[0:callPtr+1]), callList[callPtr])
 
 
 #
