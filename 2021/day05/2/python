@@ -21,8 +21,10 @@ except:
   exit(1)
 #end try
 
+# Nuke those newlines
 lines = [line.strip() for line in lines]
 
+# Debug function, for easier printing
 def print_r(lst):
   length_list = [len(str(element)) for row in lst for element in row]
   column_width = max(length_list)
@@ -33,36 +35,28 @@ def print_r(lst):
 
 def getVentCoords(ventDict):
   coordList = []
-  if ventDict["x1"] == ventDict["x2"]:
-    # X is constant - it's a vertical line
-    for y in range(min(ventDict["y1"],ventDict["y2"]),
-                   max(ventDict["y1"],ventDict["y2"])+1):
-      coordList.append({"x":ventDict["x1"], "y":y})
-  elif ventDict["y1"] == ventDict["y2"]:
-    # Y is constant - it's a horizontal line
-    for x in range(min(ventDict["x1"],ventDict["x2"]),
-                   max(ventDict["x1"],ventDict["x2"])+1):
-      coordList.append({"x":x, "y":ventDict["y1"]})
+  x1 = ventDict["x1"]
+  x2 = ventDict["x2"]
+  y1 = ventDict["y1"]
+  y2 = ventDict["y2"]
+  numSteps = max( abs(x1-x2), abs(y1-y2) )
+  if x1 < x2:
+    xSlope = +1
+  elif x1 > x2:
+    xSlope = -1
   else:
-    # Must be a diagonal
-    minX = min(ventDict["x1"],ventDict["x2"])
-    maxX = max(ventDict["x1"],ventDict["x2"])
-    lineLength = maxX - minX
-    if ventDict["x1"] < ventDict["x2"]:
-      xSlope = 1
-    else:
-      xSlope = -1
-    #end if
-    if ventDict["y1"] < ventDict["y2"]:
-      ySlope = 1
-    else:
-      ySlope = -1
-    #end if
-    #runningX = ventDict["x1"]
-    #runningY = ventDict["y1"]
-    for i in range(0,lineLength+1):
-      coordList.append({"x":ventDict["x1"]+ (i*xSlope),
-                        "y":ventDict["y1"]+ (i*ySlope)})
+    xSlope = 0
+  #end if-x
+  if y1 < y2:
+    ySlope = +1
+  elif y1 > y2:
+    ySlope = -1
+  else:
+    ySlope = 0
+  #end if-y
+  for i in range(0,numSteps+1):
+    coordList.append({ "x":x1+(i*xSlope),
+                       "y":y1+(i*ySlope)  })
   return coordList
 #end getVentCoords()
 
