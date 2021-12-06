@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+import collections
+
+def age(oldSchool):
+  newSchool = collections.Counter()
+  for x in oldSchool.keys():
+    if x == 0:
+      newSchool[6] += oldSchool[x]
+      newSchool[8] += oldSchool[x]
+    else:
+      newSchool[x-1] += oldSchool[x]
+    #end if
+  #end for
+  return newSchool
+#end age()
+
+def countFish(school):
+  sum = 0
+  for ofAge in school.keys():
+    sum += school[ofAge]
+  return sum
+#end countFish()
+
+def display(school):
+  for ofAge in sorted(school.keys()):
+    print("Age %d: %d" % (ofAge, school[ofAge]) )
+  print()
+#end printSchool()
+
+input = [int(age) for age in lines[0].split(',')]
+school = collections.Counter()
+for fish in input:
+  school[fish] += 1
+#end for
+
+#print("Initial state:",str(school))
+days = 256
+for day in range(0,days):
+  school = age(school)
+  #print("After",
+  #      "".join(str(day+1)).rjust(2),
+  #      countFish(school) )
+  #display(school)
+
+print( "After %s days: " % days,
+       countFish(school) )
+#display(school)
+
+
+

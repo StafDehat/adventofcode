@@ -36,3 +36,27 @@ def print_r(lst):
 #
 # The Meat
 
+def age(school):
+  for f in range(0,len(school)):
+    if school[f] == 0:
+      school[f] = 7
+      school.append(8)
+    school[f] -= 1
+  #end for
+  return school
+#end age()
+
+school = [int(age) for age in lines[0].split(',')]
+print("Initial state:",str(school))
+days = 80
+for day in range(0,days):
+  school = age(school)
+#  print("After",
+#        "".join(str(day+1)).rjust(2),
+#        str(school))
+
+print("After %s days: " % days,
+      str(len(school)))
+
+
+
