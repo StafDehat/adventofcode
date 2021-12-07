@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+crabs = [int(num) for num in lines[0].split(',')]
+crabs.sort()
+# On my input this yields 489:
+goal = int(round(sum(crabs) / len(crabs),0))
+# But, correct goal is 488
+print("Crab avg: ", str(sum(crabs) / len(crabs)) )
+print("Goal by average:", str(goal))
+
+fuelOptions = {}
+for goal in range(min(crabs),max(crabs)+1):
+  fuel = []
+  for crab in crabs:
+    walk = abs(crab - goal)
+    # This is fibonacci:
+    # https://en.wikipedia.org/wiki/Triangular_number
+    x = walk * (walk+1) // 2
+    fuel.append(x)
+  #print("Goal %d uses %d fuel" % (goal, sum(fuel)))
+  fuelOptions[sum(fuel)] = goal
+
+blah = list(fuelOptions.keys())
+blah.sort()
+print("Correct goal: ", fuelOptions[blah[0]])
+print(blah[0])
+
+exit(0)
+
+
+fuel = []
+for crab in crabs:
+  walk = abs(crab - goal)
+  #print("Crab %d gotta walk %d spaces" % (crab, walk))
+  #x = sum(range(walk+1))
+  x = walk * (walk+1) // 2
+  #print("That takes %d fuel" % x)
+  fuel.append(x)
+#end for
+print(sum(fuel))
+
+# 99763907 is too high
+# 99763899 is correct
+

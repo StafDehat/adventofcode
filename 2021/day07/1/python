@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+#Algorithm options:
+# Brute-force:
+#   min=crabs.sort()[0]
+#   max=crabs.sort()[len(crabs)]
+#   calculate goal=min-to-max, compare, pick shortest
+# O(n) running-total:
+#   Flawed
+# sort() & crabs[int(len(crabs)/2)]
+#   Is it really just the median?
+
+crabs = [int(num) for num in lines[0].split(',')]
+crabs.sort()
+# THIS MIGHT BE FLAWED:
+goal = crabs[int(len(crabs)/2)]
+print("Goal position:", str(goal))
+
+walk = []
+for crab in crabs:
+  walk.append(abs(crab - goal))
+#end for
+print(sum(walk))
+
+# Holy crap, it really is just the median
