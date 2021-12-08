@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+# len(x)=2: 1
+# len(x)=3: 7
+# len(x)=4: 4
+# len(x)=7: 8
+# len(x)=6: 0,6,9
+# len(x)=5: 2,3,5
+
+# Some rules:
+# diff(1,7) == segmentA
+# diff(5,6) == segmentE
+# diff(5,9) == segmentC
+# diff(0,8) == segmentD
+# diff(8,9) == segmentE
+
+# SegmentC is in 7, and will appear in 2 of 0/6/9.
+# The number missing it, is 6
+def getSix(codes069, code7):
+  # Identify the segment in 7 that's only in two of 0/6/9
+  jumble = list("".join(codes069))
+  for char in list(code7):
+    if jumble.count(char) != 2:
+      continue
+    # The code without that segment is 6
+    for code in codes069:
+      if char not in code:
+        return code
+#end getSix()
+
+# 069, -6, gives us 09.
+# 4 has a segment that will be in 9 and not 0
+def getNine(codes069,code6,code4):
+  codes09 = codes069.copy()
+  codes09.remove(code6)
+  # Now compare chars
+  # If 4 has a char not in code[0], then code[0] is 0
+  # so code[1] (the other one) is 9
+  for char in list(code4):
+    if char not in codes09[0]:
+      return codes09[1]
+  # All the chars were there, so it *was* 9 after all
+  return codes09[0]
+#end getNine()
+
+def getZero(codes069,code6,code9):
+  for code in codes069:
+    if code is code6:
+      continue
+    if code is code9:
+      continue
+    return code
+#end getZero()
+
+# Both segments from 1 will be in 3
+# 2 & 5 will be missing one of those segments
+def getThree(codes235,code1):
+  chars = list(code1)
+  for code in codes235:
+    if chars[0] in code and chars[1] in code:
+      return code
+#end getThree()
+
+# 2 has a segment we won't find in 9.  5 is fully contained.
+# Also, 3 isn't 2 or 5
+def getTwo(codes235,code3,code9):
+  # First trim 3 from the candidates:
+  codes25 = codes235.copy()
+  codes25.remove(code3)
+  # Now compare chars
+  for char in list(codes25[0]):
+    if char not in code9:
+      return codes25[0]
+  # If all chars were in code9, then it was 5, and the other one is 2
+  return codes25[1]
+#end getTwo()
+
+def getFive(codes235,code3,code2):
+  for code in codes235:
+    if code is code2:
+      continue
+    if code is code3:
+      continue
+    return code
+#end getZero()
+
+
+outputVals = []
+
+for line in lines:
+  signalStrs = line.split("|")[0].split()
+  signalStrs = ["".join(sorted(list(x))) for x in signalStrs]
+  outputStrs = line.split("|")[1].split()
+  outputStrs = ["".join(sorted(list(x))) for x in outputStrs]
+
+  codeFor = {}
+  numVal = {}
+  # Sort the list of signalStrs by length:
+  signalStrs.sort(key=len)
+  # The codes now correspond to:
+  # Pos0: 1
+  # Pos1: 7
+  # Pos2: 4
+  # Pos3: 2/3/5?
+  # Pos4: 2/3/5?
+  # Pos5: 2/3/5?
+  # Pos6: 0/6/9?
+  # Pos7: 0/6/9?
+  # Pos8: 0/6/9?
+  # Pos9: 8
+
+  # Numbers 1,4,7,8 at positions 0,1,2,9 have only 1 possibility
+  code1 = signalStrs[0]
+  codeFor[1] = code1
+  numVal[code1] = 1
+
+  code7 = signalStrs[1]
+  codeFor[7] = code7
+  numVal[code7] = 7
+
+  code4 = signalStrs[2]
+  codeFor[4] = code4
+  numVal[code4] = 4
+
+  code8 = signalStrs[9]
+  codeFor[8] = code8
+  numVal[code8] = 8
+
+  code6 = getSix(signalStrs[6:9],code7)
+  codeFor[6] = code6
+  numVal[code6] = 6
+
+  code9 = getNine(signalStrs[6:9],code6,code4)
+  codeFor[9] = code9
+  numVal[code9] = 9
+
+  code0 = getZero(signalStrs[6:9],code6,code9)
+  codeFor[0] = code0
+  numVal[code0] = 0
+
+  code3 = getThree(signalStrs[3:6],code1)
+  codeFor[3] = code3
+  numVal[code3] = 3
+
+  code2 = getTwo(signalStrs[3:6],code3,code9)
+  codeFor[2] = code2
+  numVal[code2] = 2
+
+  code5 = getFive(signalStrs[3:6],code3,code2)
+  codeFor[5] = code5
+  numVal[code5] = 5
+
+  # Print decoder:
+  #for x in range(0,10):
+  #  print("Code for %d: %s" % (x,codeFor[x]))
+
+  # Decode outputStrs:
+  result = 0
+  for code in outputStrs:
+    result = result*10 + numVal[code]
+
+  outputVals.append(result)
+  #print(result)
+#end decoding loop
+
+print(sum(outputVals))
+
+#print(sum)
+
+
