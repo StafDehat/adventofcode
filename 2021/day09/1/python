@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def isLow(rowNum, colNum):
+  #global grid
+  myDepth = grid[rowNum][colNum]
+  # Input validation - only look at coords within bounds
+  if colNum not in range(0,numCols):
+    return False
+  if rowNum not in range(0,numRows):
+    return False
+  # Look left
+  if colNum > 0:
+    if grid[rowNum][colNum-1] <= myDepth:
+      return False
+  # Look right
+  if colNum < numCols-1:
+    if grid[rowNum][colNum+1] <= myDepth:
+      return False
+  # Look up
+  if rowNum > 0:
+    if grid[rowNum-1][colNum] <= myDepth:
+      return False
+  # Look down
+  if rowNum < numRows-1:
+    if grid[rowNum+1][colNum] <= myDepth:
+      return False
+  return True
+#end isLow()
+
+
+grid = []
+for line in lines:
+  grid.append([int(digit) for digit in list(line)])
+#end for
+
+numRows = len(grid)
+numCols = len(grid[0])
+
+lowPoints = []
+for rowNum in range(0,numRows):
+  for colNum in range(0,numCols):
+    if isLow(rowNum,colNum):
+      lowPoints.append({"row":rowNum, "col":colNum})
+
+print("Low points:")
+for lowPoint in lowPoints:
+  print(lowPoint["row"], lowPoint["col"])
+
+print("Risk levels:")
+riskLevels = []
+for lowPoint in lowPoints:
+  riskLevel = grid[lowPoint["row"]][lowPoint["col"]] + 1
+  riskLevels.append(riskLevel)
+
+print(riskLevels)
+
+print("Total risk:")
+print(sum(riskLevels))
+
