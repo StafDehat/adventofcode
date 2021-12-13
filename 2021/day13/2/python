@@ -40,7 +40,9 @@ import re
 
 def display(grid):
   # Don't bother printing if it's too much to be readable
-  if len(grid) < 100 and len(grid[0]) < 200:
+  if len(grid) > 100 or len(grid[0]) > 200:
+    print("Grid is huge - omitting graphical rendering")
+  else:
     for row in grid:
       line = ""
       for pos in row:
@@ -68,7 +70,7 @@ def buildGrid(input, folds):
       dots.append({"x":x,"y":y})
     #end if
   #end for
-
+  #
   # I dynamically determined the dimensions of my 2d list, by
   #   pre-processing the list of dot coords, and grabbing the
   #   maxX & maxY
@@ -84,7 +86,7 @@ def buildGrid(input, folds):
   maxDotY = max([ dot["y"] for dot in dots ])
   maxX = max( 2*maxFoldX, maxDotX )
   maxY = max( 2*maxFoldY, maxDotY )
-
+  #
   # Initialize grid[]
   # 2d list of booleans, dot or not
   grid = getEmptyGrid( maxY+1, maxX+1 )
