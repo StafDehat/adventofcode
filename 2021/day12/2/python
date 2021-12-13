@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
   
 import sys
+from copy import deepcopy
 
 # Debug function
 def debug(output):
@@ -63,36 +64,54 @@ def getRoutes(paths, history, urhere):
   routes = []
   if urhere == "end":
     #print(history+["end"])
-    routes.append(history + ["end"])
+    routes.append(history+["end"])
     return routes
-  for cave in getOptions(paths, set(history), urhere):
+  for cave in getOptions(paths, history, urhere):
     for route in getRoutes(paths, history+[urhere], cave):
       routes.append(route)
   return routes
 #end getRoutes()
 
 # Return set of nextHop options
-def getOptions(paths, visited, urhere):
+def getOptions(paths, history, urhere):
   options = []
+  # If we're already at "end", there are no more options
   if urhere == "end":
     return options
   for path in paths[urhere]:
+    # The start is never an option:
     if path == "start":
       continue
-    # Option to re-visit one small cave per trip, here
-    if isSmall(path) and path in visited:
+    # Big caves are always an option:
+    if isLarge(path):
+      options.append(path)
       continue
-    options.append(path)
+    # Small caves are an option once/twice
+    if isSmall(path):
+      # Every small cave is an option once
+      if path not in set(history):
+        options.append(path)
+        continue
+      # If *any* small caves have been revisited, then *none* are allowed a second time
+      # I'm considering revisiting a small cave - it's only an option if I haven't revisited one yet
+      if not isSmallDupe(history+[urhere]):
+        options.append(path)
+      continue
   return options
 #end getPaths()
+
+def isSmallDupe(caves):
+  for cave in set(caves):
+    if isLarge(cave):
+      continue
+    if caves.count(cave) > 1:
+      return True
+  return False
+#end isSmallDupe()
 
 routes = getRoutes(paths, [], "start")
 for route in routes:
   print(route)
 print(len(routes))
-
-
-
-
 
 
