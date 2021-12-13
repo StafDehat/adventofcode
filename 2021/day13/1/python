@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+import re
+
+def display(grid):
+  total = 0
+  for row in grid:
+    line = ""
+    for pos in row:
+      if pos:
+        line += "#"
+        total += 1
+      else:
+        line += "."
+    #end for
+    print(line)
+  #end for
+  #print(sum([lst.count(True) for lst in grid]))
+  print("Visible dots:", total)
+  print()
+#end display()
+
+def buildGrid(input):
+  dots = []
+  # Convert strings to parallel arrays of x & y coords
+  for line in input:
+    if re.match(r"^\s*\d+,\d+\s*$", line):
+      x = int(line.split(",")[0])
+      y = int(line.split(",")[1])
+      dots.append({"x":x,"y":y})
+    #end if
+  #end for
+  # Initialize grid[]
+  # 2d list of booleans, dot or not
+  grid = getEmptyGrid(
+           max([ dot["y"] for dot in dots ])+1,
+           max([ dot["x"] for dot in dots ])+1 )
+  # Draw the dots
+  for dot in dots:
+    grid[dot["y"]][dot["x"]] = True
+  return grid
+#end buildGrid()
+
+def getFolds(input):
+  folds = []
+  for line in input:
+    if re.match(r"^\s*fold\s+along\s+[y|x]\s*=\s*\d+\s*$", line):
+      line = line.split()[2]
+      folds.append( {"axis": line.split("=")[0],
+                     "pos":  int(line.split("=")[1])} )
+    #end if
+  #end for
+  return folds
+#end getFolds()
+
+def getEmptyGrid(height,width):
+  grid = []
+  for y in range(height):
+    grid.append([False for i in range(width)])
+  return grid
+#end getEmptyGrid()
+
+def vFlip(grid):
+  newGrid = getEmptyGrid(len(grid),len(grid[0]))
+  for yPos in range(len(grid)):
+    newGrid[len(grid)-(yPos+1)] = grid[yPos].copy()
+  return newGrid
+#end vFlip()
+
+def hFlip(grid):
+  newGrid = getEmptyGrid(len(grid),len(grid[0]))
+  for yPos in range(len(grid)):
+    for xPos in range(len(grid[yPos])):
+      newGrid[yPos][xPos] = grid[yPos][len(grid[yPos])-(xPos+1)]
+  return newGrid
+#end hFlip()
+
+def doFoldUp(grid, pos):
+  # Essentially, cut at y=pos, and vFlip just the bottom portion
+  topGrid = grid[0:pos]
+  botGrid = vFlip(grid[pos+1:])
+  # Instantiate a blank new grid
+  newWidth = len(grid[0])
+  newHeight = max( len(topGrid), len(botGrid) )
+  newGrid = getEmptyGrid(newHeight,newWidth)
+
+  centerPos = int(len(grid)/2)
+  # Folding in half - 1-to-1 comparisons
+  if pos == centerPos:
+    for y in range(pos):
+      for x in range(newWidth):
+        newGrid[y][x] = topGrid[y][x] or botGrid[y][x]
+    return newGrid
+  #end if
+
+  # NOT folding in half.  One will have more rows than the other.  Identify which.
+  if pos > centerPos:
+    shortGrid = botGrid
+    tallGrid = topGrid
+  else:
+    shortGrid = topGrid
+    tallGrid = botGrid
+  #end if
+
+  # Straight-copy the portion that doesn't overlap
+  lonelyRows = len(tallGrid)-len(shortGrid)
+  for yPos in range(0,lonelyRows):
+    newGrid[yPos] = tallGrid[yPos].copy()
+  # Overlay the overlapping portions - align to bottom
+  for yPos in range(lonelyRows,newHeight):
+    for xPos in range(newWidth):
+      newGrid[yPos][xPos] = shortGrid[yPos-lonelyRows][xPos] or tallGrid[yPos][xPos]
+  return newGrid
+#end doFoldUp()
+
+def doFoldLeft(grid, pos):
+  # Essentially, cut at x=pos, and hFlip just the right portion
+  leftGrid = [row[0:pos] for row in grid]
+  rightGrid = hFlip([row[pos+1:] for row in grid])
+
+  # Instantiate a blank new grid
+  newWidth = max( len(leftGrid[0]), len(rightGrid[0]) )
+  newHeight = len(grid)
+  newGrid = getEmptyGrid(newHeight,newWidth)
+
+  centerPos = int(len(grid[0])/2)
+  # Folding in half - 1-to-1 comparisons
+  if pos == centerPos:
+    for y in range(newHeight):
+      for x in range(pos):
+        newGrid[y][x] = leftGrid[y][x] or rightGrid[y][x]
+    return newGrid
+  #end if
+
+  # NOT folding in half.  One will have more cols than the other.  Identify which.
+  if pos > centerPos:
+    thinGrid = rightGrid
+    wideGrid = leftGrid
+  else:
+    thinGrid = leftGrid
+    wideGrid = rightGrid
+  #end if
+
+  # Straight-copy the portion that doesn't overlap
+  lonelyCols = len(wideGrid[0])-len(thinGrid[0])
+  for yPos in range(newHeight):
+    for xPos in range(0,lonelyCols):
+      newGrid[yPos][xPos] = wideGrid[yPos][xPos]
+  # Overlay the overlapping portions - align to bottom
+  for yPos in range(newHeight):
+    for xPos in range(lonelyCols,newWidth):
+      newGrid[yPos][xPos] = thinGrid[yPos][xPos-lonelyCols] or wideGrid[yPos][xPos]
+  return newGrid
+#end doFoldLeft()
+
+def doFold(grid, fold):
+  if fold["axis"] == "y":
+    return doFoldUp(grid, fold["pos"])
+  return doFoldLeft(grid, fold["pos"])
+#end doFold()
+
+grid = buildGrid(lines)
+
+print("Initial conditions:")
+display(grid)
+
+folds = getFolds(lines)
+
+for fold in folds:
+  print(fold)
+
+
+for fold in folds:
+  grid = doFold(grid, fold)
+  print("After folding along %s=%d:" % (fold["axis"], fold["pos"]))
+  display(grid)
+  break
+
