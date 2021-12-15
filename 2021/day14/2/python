@@ -36,6 +36,7 @@ def print_r(lst):
 #
 # The Meat
 import re
+import collections
 
 def display(content):
   for line in content:
@@ -57,35 +58,35 @@ def getPolymer(lines):
       return list(line)
 #end getPolymer()
 
-def grow(polymer, pairs):
-  newPolymer = []
-  for i in range(0,len(polymer)-1):
-    try:
-      newChar = pairs["".join(polymer[i:i+2])]
-      newPolymer.append(polymer[i])
-      newPolymer.append(newChar)
-    except KeyError:
-      continue
-  newPolymer.append(polymer[len(polymer)-1])
-  return newPolymer
+def grow(polyCount, pairs):
+  global numChars
+  newPolyCount = collections.Counter()
+  for pair in polyCount.keys():
+    lChar = list(pair)[0]
+    rChar = list(pair)[1]
+    cChar = pairs[pair]
+    newPolyCount[lChar+cChar] += polyCount[pair]
+    newPolyCount[cChar+rChar] += polyCount[pair]
+    numChars[cChar] += polyCount[pair]
+  return newPolyCount
 #end grow()
+
 
 pairs = buildPairs(lines)
 polymer = getPolymer(lines)
 
-for i in range(40):
-  polymer = grow(polymer, pairs)
+numChars = collections.Counter()
+for char in list(polymer):
+  numChars[char] += 1
+
+# Represent the polymer as a counter of base-pair occurrences
+polyCount = collections.Counter()
+for x in range(0,len(polymer)-1):
+  polyCount["".join(polymer[x:x+2])] += 1
 #end for
 
-common = 0
-seldom = polymer.count(polymer[0])
-for element in set(polymer):
-  x = polymer.count(element)
-  if x > common:
-    common = x
-  if x < seldom:
-    seldom = x
-#end for
-print(common - seldom)
+for x in range(40):
+  polyCount = grow(polyCount, pairs)
 
+print(max(numChars.values()) - min(numChars.values()))
 
