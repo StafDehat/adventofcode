@@ -37,6 +37,7 @@ def print_r(lst):
 # The Meat
 
 def display(grid):
+  print()
   for row in grid:
     print(row)
 #end display()
@@ -44,7 +45,6 @@ def display(grid):
 def cascade(x,y):
   global grid
   global weights
-
   if x > 0:
     if weights[x][y]+grid[x-1][y] < weights[x-1][y]:
       weights[x-1][y] = weights[x][y]+grid[x-1][y]
@@ -62,10 +62,28 @@ def cascade(x,y):
       weights[x][y+1] = weights[x][y]+grid[x][y+1]
       cascade(x,y+1)
 #end cascade()
-#cascade(0,0)
 
 grid = [ [ int(char) for char in line ] for line in lines ]
+#display(grid)
 
+
+
+
+wideGrid = []
+for row in grid:
+  newRow = []
+  for i in range(5):
+    newRow = newRow + [ ((num+i-1)%9)+1 for num in row ]
+  wideGrid.append(newRow)
+#end for
+grid = wideGrid
+
+tallGrid = []
+for i in range(5):
+  tallGrid = tallGrid + [ [ ((num+i-1)%9)+1 for num in row ] for row in grid ]
+grid = tallGrid
+
+#display(tallGrid)
 
 
 
@@ -86,55 +104,55 @@ for y in range(len(grid)):
       weights[x][y+1] = min(weights[x][y+1],weights[x][y]+grid[x][y+1])
 
 
-#for y in range(len(grid)):
-#  for x in range(len(grid[y])):
-#    stack = []
-#    stack.append([x,y])
-#    while len(stack) > 0:
-#      coords = stack.pop()
-#      x = coords[0]
-#      y = coords[1]
-#
-#      if x > 0:
-#        if weights[x][y]+grid[x-1][y] < weights[x-1][y]:
-#          weights[x-1][y] = weights[x][y]+grid[x-1][y]
-#          stack.append([x-1,y])
-#      if x < len(weights)-1:
-#        if weights[x][y]+grid[x+1][y] < weights[x+1][y]:
-#          weights[x+1][y] = weights[x][y]+grid[x+1][y]
-#          stack.append([x+1,y])
-#      if y > 0:
-#        if weights[x][y]+grid[x][y-1] < weights[x][y-1]:
-#          weights[x][y-1] = weights[x][y]+grid[x][y-1]
-#          stack.append([x,y-1])
-#      if y < len(weights[x])-1:
-#        if weights[x][y]+grid[x][y+1] < weights[x][y+1]:
-#          weights[x][y+1] = weights[x][y]+grid[x][y+1]
-#          stack.append([x,y+1])
+for y in range(len(grid)):
+  for x in range(len(grid[y])):
+    stack = []
+    stack.append([x,y])
+    while len(stack) > 0:
+      coords = stack.pop()
+      x = coords[0]
+      y = coords[1]
+
+      if x > 0:
+        if weights[x][y]+grid[x-1][y] < weights[x-1][y]:
+          weights[x-1][y] = weights[x][y]+grid[x-1][y]
+          stack.append([x-1,y])
+      if x < len(weights)-1:
+        if weights[x][y]+grid[x+1][y] < weights[x+1][y]:
+          weights[x+1][y] = weights[x][y]+grid[x+1][y]
+          stack.append([x+1,y])
+      if y > 0:
+        if weights[x][y]+grid[x][y-1] < weights[x][y-1]:
+          weights[x][y-1] = weights[x][y]+grid[x][y-1]
+          stack.append([x,y-1])
+      if y < len(weights[x])-1:
+        if weights[x][y]+grid[x][y+1] < weights[x][y+1]:
+          weights[x][y+1] = weights[x][y]+grid[x][y+1]
+          stack.append([x,y+1])
 #end while
 
 #print(weights[len(weights[0])-1][len(weights)-1])
 #exit(0)
 
 
-for y in range(len(grid)):
-  for x in range(len(grid[y])):
-    if x > 0:
-      if weights[x][y]+grid[x-1][y] < weights[x-1][y]:
-        weights[x-1][y] = weights[x][y]+grid[x-1][y]
-        cascade(x-1,y)
-    if x < len(weights)-1:
-      if weights[x][y]+grid[x+1][y] < weights[x+1][y]:
-        weights[x+1][y] = weights[x][y]+grid[x+1][y]
-        cascade(x+1,y)
-    if y > 0:
-      if weights[x][y]+grid[x][y-1] < weights[x][y-1]:
-        weights[x][y-1] = weights[x][y]+grid[x][y-1]
-        cascade(x,y-1)
-    if y < len(weights[x])-1:
-      if weights[x][y]+grid[x][y+1] < weights[x][y+1]:
-        weights[x][y+1] = weights[x][y]+grid[x][y+1]
-        cascade(x,y+1)
+#for y in range(len(grid)):
+#  for x in range(len(grid[y])):
+#    if x > 0:
+#      if weights[x][y]+grid[x-1][y] < weights[x-1][y]:
+#        weights[x-1][y] = weights[x][y]+grid[x-1][y]
+#        cascade(x-1,y)
+#    if x < len(weights)-1:
+#      if weights[x][y]+grid[x+1][y] < weights[x+1][y]:
+#        weights[x+1][y] = weights[x][y]+grid[x+1][y]
+#        cascade(x+1,y)
+#    if y > 0:
+#      if weights[x][y]+grid[x][y-1] < weights[x][y-1]:
+#        weights[x][y-1] = weights[x][y]+grid[x][y-1]
+#        cascade(x,y-1)
+#    if y < len(weights[x])-1:
+#      if weights[x][y]+grid[x][y+1] < weights[x][y+1]:
+#        weights[x][y+1] = weights[x][y]+grid[x][y+1]
+#        cascade(x,y+1)
 
 
 
@@ -142,5 +160,5 @@ for y in range(len(grid)):
 #display(weights)
 print(weights[len(weights[0])-1][len(weights)-1])
 
-# Solution < 697
+# Solution > 2189
 
