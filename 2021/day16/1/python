@@ -133,15 +133,23 @@ def parse(bitStr):
              "value":   subPkts }, offset
 #end parse()
 
-def display(data):
-  for key in data.keys():
-    print(key, data[key])
-#end display()
+def sumVersions(data):
+  verSum = data["version"]
+  if data["type"] != 4:
+    for pkt in data["value"]:
+      verSum += sumVersions(pkt)
+  return verSum
+#end sumVersions()
+
 
 hexStr = lines[0]
 bitLen = len(hexStr) * 4
 bitStr = (bin(int(hexStr, 16))[2:]).zfill(bitLen)
 
 result = parse(bitStr)
-display(result[0])
+data = result[0]
+print(data)
+print(sumVersions(data))
+
+
 
