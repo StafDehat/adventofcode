@@ -140,12 +140,12 @@ for xVel in range(minXVel,maxXVel+1):
     #print(xVel,yVel)
     if hitsTarget(xVel,yVel):
       total += 1
-#      print(xVel,yVel)
+      print(xVel,yVel)
 
 # Spiking straight into the target is always a solution:
-#for xVel in range(targetMinX,targetMaxX+1):
-#  for yVel in range(targetMinY,targetMaxY+1):
-#    print(xVel,yVel)
+for xVel in range(targetMinX,targetMaxX+1):
+  for yVel in range(targetMinY,targetMaxY+1):
+    print(xVel,yVel)
 
 print(total + (targetMaxX-targetMinX+1)*(targetMaxY-targetMinY+1))
 
