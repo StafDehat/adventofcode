@@ -57,20 +57,27 @@ def largest(x):
   return max(map(largest,x))
 #end largest()
 
-def reduce(pair):
-  newPair = pair
+def reduce(tree):
+  newTree = tree
+  print("Input:",tree)
   while True:
-    # If any pair is nested inside four pairs, the leftmost such pair explodes.
+    # If any pair is nested 4-deep, the left-most such pair explodes.
     # If any regular number is 10 or greater, the leftmost such regular number splits.
-    if willExplode(newPair,0):
-      newPair = explode(newPair,0)
+    if willExplode(newTree,0):
+      newTree = explode(newTree,0)
+      # Explode() returns a list, and maybe a tuple to be summed into that list
+      # If there's still a tuple at this top-level, discard it.
+      if type(newTree) is tuple:
+        newTree = newTree[0]
+      print("After explode:",newTree)
       continue
-    if willSplit(newPair):
-      newPair = split(newPair)
+    if willSplit(newTree):
+      newTree = split(newTree)
+      print("After split:  ",newTree)
       continue
     break
   #end while
-  return pair
+  return newTree
 #end reduce()
 
 def willExplode(x,curDepth):
@@ -86,30 +93,73 @@ def willSplit(num):
 #end willSplit()
 
 def addToLeft(num,lst):
-  # A list of 2x ints, under 4 other lists, will explode
-  if isinstance(x,list):
-    left = x[0]
-    right = x[1]
-  return lst + num
+  # Get the end-case out of the way first
+  if type(lst) is int:
+    return lst+num
+  # Since not int, we'll have a list
+  left = lst[0]
+  right = lst[1]
+  newLeft = addToLeft(num,left)
+  return [newLeft,right]
 #end addToLeft()
 
+def addToRight(num,lst):
+  # Get the end-case out of the way first
+  if type(lst) is int:
+    return lst+num
+  # Since not int, we'll have a list
+  left = lst[0]
+  right = lst[1]
+  newRight = addToRight(num,right)
+  return [left,newRight]
+#end addToRight()
+
 def explode(x,xDepth):
-  # A list of 2x ints, under 4 other lists, will explode
-  if isinstance(x,list):
-    left = x[0]
-    right = x[1]
-    if willExplode(left,xDepth+1):
-      if depth(left) == 1:
-        # 'left' explodes
-        return 0,left
-      # SubLst will explode
-      result = explode(left,xDepth+1)
-      if type(result) is tuple:
-        
-    if willExplode(right,xDepth+1) 
-    subLst = explode(x,depth+1)
-    if 
-  return
+  # It's me.  I'm exploding.
+  if depth(x) == 1:
+    return 0,x
+  # x = Int, List, or Tuple
+  # Ints will never be told to explode
+  # Lists, yes
+  # Tuples will return from explode(), but won't themselves explode
+  # Conclusion, assume we were handed a list
+  left = x[0]
+  right = x[1]
+  # Explode the relevant subtree, and handle the result
+  if willExplode(left,xDepth+1):
+    result = explode(left,xDepth+1)
+    # If list, tuple additions were handled in subtrees - just return up the chain.
+    if isinstance(result,list):
+      return [result,right]
+    # Tuple: handle the additions, and possibly return only a list
+    # Left = post-explosion left
+    left = result[0]
+    # The explosion cascades left & right, as addition
+    blast = result[1]
+    leftBlast = blast[0]
+    rightBlast = blast[1]
+    # Add rightBlast to the left-most int in the right tree:
+    right = addToLeft(rightBlast,right)
+    # rightBlast handled - if leftBlast previously handled, drop the tuple
+    if leftBlast == 0:
+      return [left,right]
+    # leftBlast non-zero.  Return the tuple, but set rightBlast=0
+    return [left,right],[leftBlast,0]
+  # We can assume right will explode, since left didn't.
+  # If nothing was gonna explode, we wouldn't have been called.
+  #if willExplode(right,xDepth+1):
+  # Same code as above, just sans-comments:
+  result = explode(right,xDepth+1)
+  if isinstance(result,list):
+    return [left,result]
+  right = result[0]
+  blast = result[1]
+  leftBlast = blast[0]
+  rightBlast = blast[1]
+  left = addToRight(leftBlast,left)
+  if rightBlast == 0:
+    return [left,right]
+  return [left,right],[0,rightBlast]
 #end explode()
 
 def split(x):
