@@ -176,6 +176,17 @@ def split(x):
     return [int(x/2),int((x+1)/2)]
 #end split()
 
+def magnitude(tree):
+  # Magnitude of int: That int
+  if type(tree) is int:
+    return tree
+  # Magnitude of pair: 3*mag(left)+2*mag(right)
+  left = tree[0]
+  right = tree[1]
+  return 3*magnitude(left) + 2*magnitude(right)
+#end magnitude()
+
+
 
 import ast
 nums = []
@@ -183,5 +194,8 @@ for line in lines:
   nums.append(ast.literal_eval(line))
 #end for
 
-
+solution = nums[0]
+for num in nums[1:]:
+  solution = addition(solution,num)
+print("Magnitude:", magnitude(solution))
 
