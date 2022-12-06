@@ -83,7 +83,6 @@ func main() {
     check(err)
     sum = sum + lineI
   }
-  // Fix off-by-one.  Append the last elf, who has no blank line following him.
   elfCals = append(elfCals, sum)
 
   // Print each elf's caloric load
@@ -91,13 +90,10 @@ func main() {
     fmt.Println(elf)
   }
 
-  // Sort elves by caloric load
+  // Sort elves by caloric load, decreasing
   sort.Slice(elfCals, func(i, j int) bool {
-    return elfCals[i] < elfCals[j]
+    return elfCals[i] > elfCals[j]
   })
 
-  // Print each elf's caloric load
-  for _,elf := range elfCals {
-    fmt.Println(elf)
-  }
+  fmt.Println( elfCals[0] + elfCals[1] + elfCals[2] )
 }
