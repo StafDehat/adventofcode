@@ -22,7 +22,8 @@ touch day${DAY}/{input,sample}
 
 cp ./skel.py   day${DAY}/1/python
 cp ./skel.bash day${DAY}/1/bash
-chmod +x day${DAY}/1/*
+cp ./skel.go day${DAY}/1/1.go
+chmod +x day${DAY}/1/{python,bash}
 
 #cp ./skel.py   day${DAY}/2/python
 #cp ./skel.bash day${DAY}/2/bash
