@@ -1,0 +1,25 @@
+#!/bin/bash
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+while read LINE; do
+  grep -Po '\d' <<<"${LINE}" | # Only print the digits, one per line
+    sed -n '1p;$p' | # Print the first line.  Print the last ($) line.
+    tr -d '\n' # Remove the newline characters
+  echo # Add 1 newline character
+done < $1 | sum
+
