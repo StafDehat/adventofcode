@@ -13,6 +13,13 @@ function average() {
 }
 
 
+function min() {
+  grep -Po '\d+' | sort -n | head -n 1
+}
+function max() {
+  grep -Po '\d+' | sort -n | tail -n 1
+}
+
 # Take whitespace-separated input from either 
 #   arguments or STDIN, and calculate the product.
 function sum() {
