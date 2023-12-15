@@ -35,4 +35,19 @@ def print_r(lst):
 
 #
 # The Meat
+print_r(lines)
+# lines[x][y]
+#   y y
+# x . .
+# x . .
+
+# Find coords of every symbol
+numRows = len(lines)
+numCols = len(lines[0])
+
+for x in range(numRows):
+  
+
+# For each symbol, find coords of *start* of every number
+# De-dupe
 
