@@ -5,23 +5,15 @@ input=$( cat "${1}" )
 ranges=$( grep -- - <<<"${input}" )
 ingredients=$( grep -P '^\d+$' <<<"${input}" )
 
-numRanges=$( wc -l <<<"${ranges}" )
-echo "${numRanges} ranges in list"
-i=0
-fresh=$(
+freshAvail=0
+for ingredient in ${ingredients}; do
   while IFS='-' read min max; do
-    seq ${min} ${max}
-    i=$((i+1))
-    echo "Processed range (${i}/${numRanges}): ${min}-${max}" >&2
+    [[ ${ingredient} -lt ${min} ]] && continue
+    [[ ${ingredient} -gt ${max} ]] && continue
+    freshAvail=$(( freshAvail + 1 ))
+    break
   done <<<"${ranges}"
-)
-echo "$( wc -l <<<"${fresh}") fresh ingredients"
-echo "$( wc -l <<<"${ingredients}") available ingredients"
+done
 
-freshAvail=$( 
-  comm -12 <(echo "${fresh}" | sort -u) \
-           <(echo "${ingredients}" | sort)
-)
-
-echo "$(wc -l <<<"${freshAvail}") fresh & available ingredients"
+echo "${freshAvail} fresh ingredients"
 
