@@ -12,6 +12,8 @@ function highest() {
   xargs -n1 echo <<<"${@}" | sort -nr | head -n 1
 }
 
+#
+# Return whether or not the two provided ranges overlap each other
 function rangesOverlap() {
   local rangeA="${1}"
   local rangeB="${2}"
@@ -23,10 +25,17 @@ function rangesOverlap() {
   return 1
 }
 
+#
+# Input: Two overlapping ranges
+# Output: Single range - union of the two
 function newRange() {
   echo "$(lowest ${@/-/ })-$(highest ${@/-/ })"
 }
 
+#
+# Incorporate a new range into $newRange[], either
+#   by appending a new range to the array, or by
+#   adjusting the bounds of an existing range.
 function incorporate() {
   local newMin=${1}
   local newMax=${2}
