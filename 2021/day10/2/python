@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def tallyLine(line):
+  pairs = {
+    "(": ")",
+    "{": "}",
+    "[": "]",
+    "<": ">"
+  }
+  openers = pairs.keys()
+  closers = pairs.values()
+  stack = []
+  line = list(line)
+  for char in line:
+    if char in openers:
+      stack.append(char)
+      continue
+    if char in closers:
+      if char == pairs[stack.pop()]:
+        continue
+      else:
+        corrupt[char] += 1
+        return False
+  #end for
+  # Whatever's left is incomplete:
+  return "".join(stack)
+#end checkCorrupted()
+
+def scoreCorrupt(tally):
+  # ): 3 points.
+  # ]: 57 points.
+  # }: 1197 points.
+  # >: 25137 points.
+  total = 0
+  total += tally[')']*3
+  total += tally[']']*57
+  total += tally['}']*1197
+  total += tally['>']*25137
+  return total
+#end scoreCorrupt()
+
+def scoreIncomplete(missing):
+  # ): 1 points.
+  # ]: 2 points.
+  # }: 3 points.
+  # >: 4 points.
+  pts = {}
+  pts['('] = 1
+  pts['['] = 2
+  pts['{'] = 3
+  pts['<'] = 4
+  total = 0
+  missing = list(missing)
+  for x in range(len(missing)):
+    char = missing.pop()
+    total = (total*5)+pts[char]
+    print(char, total)
+  return total
+#end scoreIncomplete()
+
+corrupt = {}
+corrupt[")"] = 0
+corrupt["]"] = 0
+corrupt["}"] = 0
+corrupt[">"] = 0
+
+iScores = []
+for line in lines:
+  missingChars = tallyLine(line)
+  # It would have returned True if corrupt
+  if not missingChars:
+    print("Line is corrupt:", line)
+    continue
+  else:
+    print("Line is incomplete:", line, missingChars)
+  score = scoreIncomplete(missingChars)
+  print("Incomplete score:", score)
+  iScores.append(score)
+#end for
+
+print("Corrupt:", scoreCorrupt(corrupt))
+iScores.sort()
+score = iScores[int(len(iScores)/2)]
+print("Mode incomplete score:", score)
+
+

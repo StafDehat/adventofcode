@@ -1,0 +1,33 @@
+#!/bin/bash
+
+inFile="${1}"
+
+msgs=$( grep -P '^[ab]+' "${inFile}" )
+
+# Toss all rules into a file
+grep -P '^\d+:' "${inFile}" | sort -n > ruleFile
+
+# For each rule X, replace every reference to X with
+#   the definition of X.
+lineNum=0
+while true; do
+  lineNum=$((lineNum+1))
+  LINE=$( sed -n "${lineNum}p" ruleFile )
+  [[ -z "${LINE}" ]] && break
+  ruleNum=$( cut -d: -f1 <<<"${LINE}" )
+  ruleDef=$( cut -d\  -f2- <<<"${LINE}" )
+  perl -pi -e "s/(?<=\s)${ruleNum}(?=\s|$)/( ${ruleDef} )/g" ruleFile
+done
+
+# Turn rule 0 into a regex
+rule0=$( grep '^0:' ruleFile |
+           cut -d\  -f2- |
+           tr -d ' "' |
+           sed 's/(\([ab]\))/\1/g' )
+
+# Grep for that regex
+valid=$( perl -ne "/^${rule0}$/ && print" "${inFile}" )
+
+echo -n "Valid messages: "
+wc -l <<<"${valid}"
+

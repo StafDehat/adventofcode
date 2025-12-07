@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def isLowpoint(rowNum, colNum):
+  #global grid
+  myDepth = grid[rowNum][colNum]
+  # Input validation - only look at coords within bounds
+  if colNum not in range(0,numCols):
+    return False
+  if rowNum not in range(0,numRows):
+    return False
+  # Look left
+  if colNum > 0:
+    if grid[rowNum][colNum-1] < myDepth:
+      return False
+  # Look right
+  if colNum < numCols-1:
+    if grid[rowNum][colNum+1] < myDepth:
+      return False
+  # Look up
+  if rowNum > 0:
+    if grid[rowNum-1][colNum] < myDepth:
+      return False
+  # Look down
+  if rowNum < numRows-1:
+    if grid[rowNum+1][colNum] < myDepth:
+      return False
+  return True
+#end isLowpoint()
+
+
+grid = []
+for line in lines:
+  grid.append([int(digit) for digit in list(line)])
+#end for
+
+numRows = len(grid)
+numCols = len(grid[0])
+
+# Identify the coords of all the low points
+lowPoints = []
+for rowNum in range(0,numRows):
+  for colNum in range(0,numCols):
+    if isLowpoint(rowNum,colNum):
+      lowPoints.append({"row":rowNum, "col":colNum})
+
+print("Low points:")
+for lowPoint in lowPoints:
+  print(lowPoint["row"], lowPoint["col"])
+
+def getBasinSize(lowPoint):
+  basinMembers = set()
+  basinMembers = getBasinPoints(lowPoint["row"],lowPoint["col"])
+  print("Lowpoint %d,%d is member of basin of size %d" % (lowPoint["row"],lowPoint["col"],len(basinMembers)))
+  return len(basinMembers)
+#end getBasinSize()
+
+def getBasinPoints(rowNum, colNum):
+  # I'm always a member of my own basin
+  # If I wasn't, I wouldn't have been passed to this function
+  # Coordinate-string format: "rowNum.colNum"
+  basinMembers = set()
+  basinMembers.add("%s.%s" % (rowNum, colNum))
+
+  # Now merge the basin of any point that's both:
+  #  * Adjacent to me
+  #  * Higher than me
+  myDepth = grid[rowNum][colNum]
+  # Does LEFT run into me?
+  if colNum > 0:
+    if grid[rowNum][colNum-1] > myDepth and grid[rowNum][colNum-1] < 9:
+      basinMembers.update( getBasinPoints(rowNum,colNum-1) )
+  # Does RIGHT run into me?
+  if colNum < numCols-1:
+    if grid[rowNum][colNum+1] > myDepth and grid[rowNum][colNum+1] < 9:
+      basinMembers.update( getBasinPoints(rowNum,colNum+1) )
+  # Does UP run into me?
+  if rowNum > 0:
+    if grid[rowNum-1][colNum] > myDepth and grid[rowNum-1][colNum] < 9:
+      basinMembers.update( getBasinPoints(rowNum-1,colNum) )
+  # Does DOWN run into me?
+  if rowNum < numRows-1:
+    if grid[rowNum+1][colNum] > myDepth and grid[rowNum+1][colNum] < 9:
+      basinMembers.update( getBasinPoints(rowNum+1,colNum) )
+
+  return basinMembers
+# end getBasinPoints()
+
+
+# For each low point, calculate the size of its basin, & add that size to the list
+basinSizes = []
+for lowPoint in lowPoints:
+  basinSizes.append(getBasinSize(lowPoint))
+
+
+from math import prod
+basinSizes.sort(reverse=True)
+print(basinSizes[0:3])
+print(prod(basinSizes[0:3]))
+

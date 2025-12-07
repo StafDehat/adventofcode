@@ -1,0 +1,56 @@
+#!/bin/bash
+
+inFile="${1}"
+# Length of the preamble
+preLength=${2}
+
+# Test if $1 = sum( two things in ${@} )
+function isValid() {
+  local goalSum="${1}"
+  shift 1
+  local preamble=( ${@} )
+
+  echo "SUM: ${sum}"
+  echo "Pre: ${preamble[@]}"
+
+  # Count how many items in that array:
+  local numItems="${#preamble[@]}"
+
+  # Iterate over the array (x)
+  for x in $( seq 0 $((numItems-1)) ); do
+    numAtPosX=${preamble[${x}]}
+    for y in $( seq $((x+1)) $((numItems-1)) ); do
+      numAtPosY=${preamble[${y}]}
+      sum=$(( numAtPosX + numAtPosY ))
+      if [[ ${sum} -eq ${goalSum} ]]; then
+        #echo $(( numAtPosX * numAtPosY ))
+        return 0
+      fi
+    done
+  done
+  # If we didn't exit already, there was no match
+  return 1
+}
+
+declare -a numList
+for x in $( cat "${inFile}" ); do
+  numList[${#numList[@]}]=${x}
+done
+
+preStart=0
+preEnd=$(( preStart + preLength -1 ))
+testPos=$(( preEnd + 1 ))
+
+while [[ ${testPos} -lt ${#numList[@]} ]]; do
+  if isValid ${numList[${testPos}]} \
+             ${numList[@]:${preStart}:${preLength}}; then
+    echo "${numList[${testPos}]} at position ${testPos} is VALID"
+    preStart=$(( preStart+1 ))
+    preEnd=$(( preStart + preLength -1 ))
+    testPos=$(( preEnd + 1 ))
+    continue
+  fi
+  echo "${numList[${testPos}]} at position ${testPos} is INVALID"
+  break
+done
+

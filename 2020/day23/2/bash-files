@@ -1,0 +1,186 @@
+#!/bin/bash
+
+function debug() {
+  echo "${@}" >&2
+}
+
+function printTwoCupsFrom() {
+  local cupDir="${1}"
+  local startCup="${2}"
+  local first=$( readlink ${startCup}/next )
+  local second=$( readlink ${first}/next )
+  echo ${first}
+  echo ${second}
+}
+function printFromTo() {
+  local startCup="${1}"
+  local stopCup="${2}"
+  echo "${startCup}"
+  [[ ${startCup} -eq ${stopCup} ]] && return
+  printFromTo $(readlink ${startCup}/next) ${stopCup}
+}
+function printCupsFrom() {
+  local cupDir="${1}"
+  local target="${2}"
+  cd "${cupDir}"
+  printFromTo ${target} $(readlink ${target}/prev)
+}
+function printCups() {
+  local cupDir="${1}"
+
+  cd "${cupDir}"
+  local current=$( readlink current )
+  printFromTo ${current} $(readlink ${current}/prev)
+}
+
+function getDest() {
+  local current=${1}
+  local dest=${current}
+  while true; do
+    dest=$((dest-1))
+    if [[ ${dest} -le 0 ]]; then
+      dest=${numCups}
+    fi
+    [[ -d pickup/${dest} ]] || break
+  done
+  echo "${dest}"
+}
+
+function move() {
+  local cupDir="${1}"
+  local current
+  local dest
+  local -a pickup
+  local tmp
+
+  cd "${cupDir}"
+
+  current=$( readlink current )
+  #debug "Current cup: ${current}"
+
+  # Temporarily remove 3 cups clockwise from 'current'
+  mkdir -p pickup
+  pickup=( $( readlink current/next )
+           $( readlink $(readlink current/next)/next )
+           $( readlink $(readlink $(readlink current/next)/next)/next ) )
+  mv ${pickup[@]} pickup/
+  #debug "Moved cups: ${pickup[@]}"
+
+  # current <> pickup[2]/next
+  #   Update the current cup's "next"
+  rm -f ${current}/next
+  ln -s $( readlink pickup/${pickup[2]}/next ) ${current}/next
+  #   Reciprocate
+  rm -f $(readlink ${current}/next)/prev
+  ln -s ${current} $(readlink ${current}/next)/prev
+  #debug "Fixed links to account for gap"
+
+  # Figure out the destination cup
+  dest=$( getDest ${current} )
+  #debug "Identified next cup as ${dest}"
+
+  # Insert picked-up cups
+  mv pickup/* .
+  #debug "Moved cups back into directory"
+
+  # pickup[2] <> dest/next
+  #   Update pickup[2]'s next
+  tmp=$( readlink ${dest}/next )
+  rm -f ${pickup[2]}/next
+  ln -s ${tmp} ${pickup[2]}/next
+  #   Reciprocate
+  rm -f ${tmp}/prev
+  ln -s ${pickup[2]} ${tmp}/prev
+  #debug "Fixed ${pickup[2]}/next and ${tmp}/prev links"
+
+  # dest <> pickup[0]
+  #   Update dest's next
+  rm -f ${dest}/next
+  ln -s ${pickup[0]} ${dest}/next
+  #   Reciprocate
+  rm -f ${pickup[0]}/prev
+  ln -s ${dest} ${pickup[0]}/prev
+  #debug "Fixed ${pickup[0]}/prev and ${dest}/next links"
+
+  # Update the new current cup:
+  tmp=$( readlink current/next )
+  rm -f current
+  ln -s ${tmp} current
+}
+
+
+inFile="${1}"
+#numCups=1000000
+#numMoves=10000000
+numCups=9
+numMoves=100
+
+declare -a cups
+cups=( $( grep -Po '\d' "${inFile}" ) )
+
+# Create the cups directory
+rm -rf cups
+mkdir cups
+cd cups
+
+# Each cup "object" will be a directory
+# Create cups 1-9 in the order given:
+for cup in "${cups[@]}"; do
+  mkdir "${cup}"
+done
+# Add the extra 999,990 sequential cups:
+for cup in $( seq 10 ${numCups} ); do
+  mkdir "${cup}"
+done
+
+# First in the list is the "current" cup, initially
+ln -s ${cups[0]} current
+
+# Build the linked-list associations, as symlinks
+index=0
+while [[ ${index} -lt ${#cups[@]} ]]; do
+  cup=${cups[${index}]}
+  next=${cups[$(( (${index}+1)%${#cups[@]} ))]}
+  prev=${cups[$(( (${index}-1)%${#cups[@]} ))]}
+  ln -s "${next}" "${cup}"/next
+  ln -s "${prev}" "${cup}"/prev
+  index=$((index+1))
+done
+# Optional, more cups
+if [[ ${numCups} -gt ${#cups[@]} ]]; then
+  while [[ ${index} -lt ${numCups} ]]; do
+    index=$((index+1))
+    ln -s $((index+1)) ${index}/next
+    ln -s $((index-1)) ${index}/prev
+  done
+  # Fix the edge cases:
+  #   Label9/Pos8 loops back to start, but should point at Label10
+  rm -f ${cups[8]}/next
+  ln -s 10 ${cups[8]}/next
+  #   The first cup loops back to the 9th, but should point at numCups
+  rm -f ${cups[0]}/prev
+  ln -s ${numCups} ${cups[0]}/prev
+  #   The 10th cup points back to Pos9, but should point at Label9
+  rm -f 10/prev
+  ln -s ${cups[8]} 10/prev
+  #   The numCup points at nonexistent numCup+1, but should loop to Pos1
+  rm -f ${numCups}/next
+  ln -s ${cups[0]} ${numCups}/next
+fi
+
+moves=0
+while [[ ${moves} -lt ${numMoves} ]]; do
+  printCupsFrom . 1 | xargs echo
+  [[ $(( moves%1000 )) -eq 0 ]] && debug "Starting move #${moves}"
+  move .
+  moves=$((moves+1))
+done
+
+printCupsFrom . 1 | xargs echo
+printTwoCupsFrom . 1
+
+#printCupsFrom . 1 | xargs echo
+#printCupsFrom . 1 | xargs echo | tr -d ' 1'
+#printCupsFrom . 5 | xargs echo
+
+

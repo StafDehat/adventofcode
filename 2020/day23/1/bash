@@ -1,0 +1,126 @@
+#!/bin/bash
+
+function debug() {
+  echo "${@}" >&2
+}
+
+function printFromTo() {
+  local startCup="${1}"
+  local stopCup="${2}"
+  echo "${startCup}"
+  [[ ${startCup} -eq ${stopCup} ]] && return
+  printFromTo $(readlink ${startCup}/next) ${stopCup}
+}
+function printCupsFrom() {
+  local cupDir="${1}"
+  local target="${2}"
+  cd "${cupDir}"
+  printFromTo ${target} $(readlink ${target}/prev)
+}
+function printCups() {
+  local cupDir="${1}"
+
+  cd "${cupDir}"
+  local current=$( readlink current )
+  printFromTo ${current} $(readlink ${current}/prev)
+}
+
+function move() {
+  local cupDir="${1}"
+  local current
+  local dest
+  local -a pickup
+  local tmp
+
+  cd "${cupDir}"
+
+  current=$( readlink current )
+
+  # Temporarily remove 3 cups clockwise from 'current'
+  mkdir pickup
+  pickup=( $( readlink current/next )
+           $( readlink $(readlink current/next)/next )
+           $( readlink $(readlink $(readlink current/next)/next)/next ) )
+  mv ${pickup[@]} pickup/
+
+  # current <> pickup[2]/next
+  #   Update the current cup's "next"
+  rm -f ${current}/next
+  ln -s $( readlink pickup/${pickup[2]}/next ) ${current}/next
+  #   Reciprocate
+  rm -f $(readlink ${current}/next)/prev
+  ln -s ${current} $(readlink ${current}/next)/prev
+
+  # Figure out the destination cup
+  dest=$( ls -1d [0-9]* | grep -B 1 ${current} | grep -v "^${current}$" )
+  [[ -z "${dest}" ]] && dest=$( ls -1d [0-9]* | tail -n 1 )
+
+  # Insert picked-up cups
+  mv pickup/* .
+  rmdir pickup
+
+  # pickup[2] <> dest/next
+  #   Update pickup[2]'s next
+  tmp=$( readlink ${dest}/next )
+  rm -f ${pickup[2]}/next
+  ln -s ${tmp} ${pickup[2]}/next
+  #   Reciprocate
+  rm -f ${tmp}/prev
+  ln -s ${pickup[2]} ${tmp}/prev
+
+  # dest <> pickup[0]
+  #   Update dest's next
+  rm -f ${dest}/next
+  ln -s ${pickup[0]} ${dest}/next
+  #   Reciprocate
+  rm -f ${pickup[0]}/prev
+  ln -s ${dest} ${pickup[0]}/prev
+
+  # Update the new current cup:
+  tmp=$( readlink current/next )
+  rm -f current
+  ln -s ${tmp} current
+}
+
+
+inFile="${1}"
+
+declare -a cups
+cups=( $( grep -Po '\d' "${inFile}" ) )
+
+# Create the cups directory
+rm -rf cups
+mkdir cups
+cd cups
+
+# Each cup "object" will be a directory
+for cup in "${cups[@]}"; do
+  mkdir "${cup}"
+done
+
+# First in the list is the "current" cup, initially
+ln -s ${cups[0]} current
+
+# Build the linked-list associations, as symlinks
+index=0
+while [[ ${index} -lt ${#cups[@]} ]]; do
+  cup=${cups[${index}]}
+  next=${cups[$(( (${index}+1)%${#cups[@]} ))]}
+  prev=${cups[$(( (${index}-1)%${#cups[@]} ))]}
+  ln -s "${next}" "${cup}"/next
+  ln -s "${prev}" "${cup}"/prev
+  index=$((index+1))
+done
+
+
+moves=0
+while [[ ${moves} -lt 100 ]]; do
+  move .
+  moves=$((moves+1))
+done
+
+printCupsFrom . 1 | xargs echo
+printCupsFrom . 1 | xargs echo | tr -d ' 1'
+#printCupsFrom . 5 | xargs echo
+
+

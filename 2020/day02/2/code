@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Input validation, of a sort:
+input=$( grep -P '\d+-\d+ .: .+$' "${1}" )
+
+numValid=0
+numInvalid=0
+
+# Never set IFS without backing it up first
+IFSSave="${IFS}"
+IFS="${IFS}:-"
+
+while read pos1 pos2 char pass; do
+  count=$( cut -c${pos1},${pos2} <<<"${pass}" |
+             grep -o "${char}" | wc -l )
+  if [[ "${count}" -ne 1 ]]; then
+    numInvalid=$(( numInvalid+1 ))
+  else
+    numValid=$(( numValid+1 ))
+  fi
+done <<<"${input}"
+
+# Just good practice to restore the ENV
+IFS="${IFSSave}"
+
+echo "Valid:   ${numValid}"
+echo "Invalid: ${numInvalid}"

@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def getPktVer(bitStr):
+  return int(bitStr[0:3], 2),3
+#end pktVer()
+
+def getPktType(bitStr):
+  return int(bitStr[3:6], 2),3
+#end pktType()
+
+def parseLiteral(bitStr):
+  litStr = []
+  offset = 0
+  while True:
+    bit = bitStr[offset]
+    litStr += bitStr[offset+1:offset+5]
+    offset += 5
+    if bit == '0':
+      break
+  #end while
+  literal = int("".join(litStr),2)
+  # If this literal packet is contained within an operator packet,
+  #   then we *don't* chomp hex-multiple (/4) bits.
+  #offset = int((offset+3)/4)*4
+  return literal,offset
+#end getLiteral()
+
+def parseOpLength(bitStr):
+  # next 15 bits are a number that represents the total
+  # length in bits of the sub-packets contained by this packet.
+  length = int(bitStr[0:15],2)
+  offset = 15
+  subPkts = []
+  while offset < 15+length:
+    result = parse(bitStr[offset:15+length])
+    subPkts.append(result[0])
+    offset += result[1]
+  return subPkts,offset
+#end parseOpLength()
+
+def parseOpCount(bitStr):
+  # the next 11 bits are a number that represents the number
+  # of sub-packets immediately contained by this packet.
+  count = int(bitStr[0:11],2)
+  offset = 11
+  subPkts = []
+  for x in range(count):
+    result = parse(bitStr[offset:])
+    subPkts.append(result[0])
+    offset += result[1]
+  return subPkts,offset
+#end parseOpCount()
+
+def parseOperator(bitStr):
+  lenTypeId = bitStr[0]
+  offset = 1
+  if lenTypeId == '0':
+    result = parseOpLength(bitStr[1:])
+    subPkts = result[0]
+    offset += result[1]
+    return subPkts,offset
+  else:
+    result = parseOpCount(bitStr[offset:])
+    subPkts = result[0]
+    offset += result[1]
+  return subPkts,offset
+#end parseOperator()
+
+# Return 1 packet
+# There may be more immediately following it - ignore those
+def parse(bitStr):
+  offset = 0
+  # Whitespace
+  result = getPktVer(bitStr)
+  pktVer = result[0]
+  offset += result[1]
+  # Whitespace
+  result = getPktType(bitStr)
+  pktType = result[0]
+  offset += result[1]
+  # Whitespace
+  if pktType == 4:
+    # Literal
+    result = parseLiteral(bitStr[6:])
+    literal = result[0]
+    offset += result[1]
+    return { "version": pktVer,
+             "type":    pktType,
+             "value":   literal }, offset
+  else:
+    # Operator
+    result = parseOperator(bitStr[6:])
+    subPkts = result[0]
+    offset += result[1]
+    return { "version": pktVer,
+             "type":    pktType,
+             "value":   subPkts }, offset
+#end parse()
+
+def sumVersions(data):
+  verSum = data["version"]
+  if data["type"] != 4:
+    for pkt in data["value"]:
+      verSum += sumVersions(pkt)
+  return verSum
+#end sumVersions()
+
+
+hexStr = lines[0]
+bitLen = len(hexStr) * 4
+bitStr = (bin(int(hexStr, 16))[2:]).zfill(bitLen)
+
+result = parse(bitStr)
+data = result[0]
+print(data)
+print(sumVersions(data))
+
+
+

@@ -1,0 +1,144 @@
+#!/bin/bash
+
+inFile="${1}"
+# Length of the preamble
+preLength=${2}
+
+# GLOBAL VARIABLE?!?!
+declare -a numList
+for x in $( cat "${inFile}" ); do
+  numList[${#numList[@]}]=${x}
+done
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+# Test if $1 = sum( two things in ${@} )
+function isValid() {
+  local goalSum="${1}"
+  shift 1
+  local preamble=( ${@} )
+
+  # Count how many items in that array:
+  local numItems="${#preamble[@]}"
+
+  # Iterate over the array (x)
+  for x in $( seq 0 $((numItems-1)) ); do
+    numAtPosX=${preamble[${x}]}
+    for y in $( seq $((x+1)) $((numItems-1)) ); do
+      numAtPosY=${preamble[${y}]}
+      sum=$(( numAtPosX + numAtPosY ))
+      if [[ ${sum} -eq ${goalSum} ]]; then
+        #echo $(( numAtPosX * numAtPosY ))
+        return 0
+      fi
+    done
+  done
+  # If we didn't exit already, there was no match
+  return 1
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function testSumRange() {
+  local goalSum="${1}"
+  local rngSize="${2}"
+  local testSum
+  local botPos
+  local topPos
+  debug "Searching for ${rngSize} consecutive numbers, sum == ${goalSum}" >&2
+  botPos=0
+  topPos=$((rngSize-1))
+  while [[ "${topPos}" -lt "${#numList[@]}" ]]; do
+    testSum=$( sum ${numList[@]:${botPos}:${rngSize}} )
+    if [[ "${testSum}" -eq "${goalSum}" ]]; then
+      echo ${numList[@]:${botPos}:${rngSize}}
+      return 0
+    fi
+    botPos=$((botPos+1))
+    topPos=$((botPos+rngSize))
+  done # End sum loop
+  return 1
+}
+
+function getSumRange() {
+  local goalIndex="${1}"
+  local goalSum="${numList[${goalIndex}]}"
+  local testSum=0
+
+  local rngSize=2
+  while [[ "${rngSize}" -lt "${#numList[@]}" ]]; do
+    # Parallelizable right here
+    if testSumRange "${goalSum}" "${rngSize}"; then
+      debug "Set of ${rngSize} numbers found with correct sum"
+      return
+    fi
+    rngSize=$((rngSize+1))
+  done #End rngSize loop
+}
+
+
+function getInvalidIndex() {
+  local preLength="${1}"
+  local preStart=0
+  local preEnd=$(( preStart + preLength -1 ))
+  local testPos=$(( preEnd + 1 ))
+
+  debug "Positions 0-${preEnd} are only preamble"
+  debug "Starting validation at position ${testPos}"
+ 
+  while [[ ${testPos} -lt ${#numList[@]} ]]; do
+    # Test if number is sum of 2 from its preamble:
+    if isValid ${numList[${testPos}]} \
+               ${numList[@]:${preStart}:${preLength}}; then
+      debug "${numList[${testPos}]} at position ${testPos} is VALID"
+      preStart=$(( preStart+1 ))
+      preEnd=$(( preStart + preLength -1 ))
+      testPos=$(( preEnd + 1 ))
+      continue
+    fi
+
+    local invalidIndex=${testPos}
+    local invalidNumber=${numList[${invalidIndex}]}
+    debug "${invalidNumber} at position ${testPos} is INVALID"
+    echo "${invalidIndex}"
+    return 0
+  done
+  debug "Unable to find invalid number in list"
+  return 1
+} # END getInvalidIndex()
+
+
+invalidIndex=$( getInvalidIndex "${preLength}" )
+invalidNumber=${numList[${invalidIndex}]}
+
+declare -a sumRange
+sumRange=( $( getSumRange "${invalidIndex}" ) )
+
+debug "The following ${#sumRange[@]} consecutive numbers sum to that INVALID ${invalidNumber}:"
+debug "${sumRange[@]}"
+
+for x in "${sumRange[@]}"; do
+  echo "${x}"
+done | sort -n | sed -e 1b -e '$!d' | sum
+
+
+
+
+

@@ -1,0 +1,92 @@
+#!/bin/bash
+
+inFile="${1}"
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function heisenberg() {
+  local mask="${1}"
+  local val="${2}"
+
+  if ! grep -q 'X' <<<"${mask}"; then
+    echo "${val}"
+    return 0
+  fi
+
+  # First X to 1 - everything else to 0
+  # When OR'd, it'll force that X-pos to be 1, all else unchanged
+  local orMask=$( tr 'X1Y' '001' <<<"${mask/X/Y}" )
+
+  # First X to 0 - everything else to 1
+  # When AND'd, it'll force that X-pos to be 0, all else unchanged
+  local andMask=$( tr 'X0Y' '110' <<<"${mask/X/Y}" )
+
+  # First X was statically set in val - replace it with 0, 'cause:
+  #   If the bitmask bit is 0, the corresponding memory address bit is unchanged.
+  heisenberg "${mask/X/0}" "$(( ${val} | 2#${orMask} ))"
+  heisenberg "${mask/X/0}" "$(( ${val} & 2#${andMask} ))"
+}
+
+function applyMask() {
+  local mask="${1}"
+  local val="${2}"
+
+  # From the instructions:
+  # If the bitmask bit is 0, the corresponding memory address bit is unchanged.
+  # If the bitmask bit is 1, the corresponding memory address bit is overwritten with 1.
+  # If the bitmask bit is X, the corresponding memory address bit is floating.
+
+  # Step 1 - force the 1s to 1
+  # OR 0 = no change
+  # 0s don't change anything
+  # Xs don't change anything, since we made them 0s
+  # 1s get forced to 1
+  local orMask=${mask//X/0}
+  val=$(( val | 2#${orMask} ))
+
+  # Step 2 - force the Xs to 1 and also 0
+  heisenberg "${mask}" "${val}"
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+
+declare -a mem
+bitmask="000000000000000000000000000000000000"
+while read cmd assignment value; do
+  if [[ "${cmd}" == "mask" ]]; then
+    bitmask="${value}"
+    debug "Read new bitmask: ${bitmask}"
+    continue
+  fi
+  # Input's not "mask", so must be "mem[x]"
+  addr=$( grep -Po '\d+' <<<"${cmd}" )
+  debug "Read instruction: mem[${addr}]=${value}"
+  for addr in $( applyMask ${bitmask} ${addr} ); do
+    debug "  Setting mem[${addr}]=${value}"
+    mem[${addr}]=${value}
+  done
+done < "${inFile}"
+
+debug "${#mem[@]} memory positions contain data."
+
+sum=$( sum ${mem[@]} )
+debug "Sum of all memory values = ${sum}"
+echo "${sum}"

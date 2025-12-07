@@ -1,0 +1,57 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+inFile="${1}"
+
+# Sample data:
+#2020-12-26 00:16:06.295937028: Door public key: 17807724
+#2020-12-26 00:16:06.296843197: Card public key: 5764801
+#2020-12-26 00:16:06.298053068: Card's loopsize: 8
+#2020-12-26 00:16:06.299049308: Door's loopsize: 11
+
+# My input data:
+# Door Loop = 6041183
+# Card Loop = 
+doorKey=$( grep -Po '^\d+' ${inFile} | head -n 1 )
+cardKey=$( grep -Po '^\d+' ${inFile} | tail -n 1 )
+debug "Door public key: ${doorKey}"
+debug "Card public key: ${cardKey}"
+
+running=1
+subject=7
+dividend=20201227
+
+loopCount=0
+loopCnt=0
+loopKey=0
+while true; do
+  running=$(( (running*subject) % dividend ))
+  loopCount=$(( loopCount+1 ))
+  if (( ${running} == ${doorKey} )); then
+    debug "Door's loopsize: ${loopCount}"
+    loopCnt=${loopCount}
+    loopKey=${cardKey}
+    break
+  fi
+  if (( ${running} == ${cardKey} )); then
+    debug "Card's loopsize: ${loopCount}"
+    loopCnt=${loopCount}
+    loopKey=${doorKey}
+    break
+  fi
+done
+
+debug "Transforming subject=${loopKey} with loopsize=${loopCnt}"
+
+subject=${loopKey}
+running=1
+for x in $(seq 1 ${loopCnt}); do
+  running=$(( (running*subject) % dividend ))
+done
+
+echo "${running}"
+

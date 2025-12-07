@@ -1,0 +1,241 @@
+#!/bin/bash
+
+inFile="${1}"
+
+#
+# Read input - build the "plane" layout
+declare -A planeState
+numCols=$( head -n 1 "${inFile}" | tr -d '\n' | wc -c )
+numRows=$( wc -l < "${inFile}" )
+colNum=0
+rowNum=0
+while read LINE; do
+  colNum=0
+  while read -n1 char; do
+    planeState[${colNum},${rowNum}]="${char}"
+    colNum=$((colNum+1))
+  done <<<"${LINE}"
+  rowNum=$((rowNum+1))
+done < <( cat "${inFile}" )
+
+
+#------------------#
+# Helper functions #
+#------------------#
+
+#
+# Print args to stderr
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+#
+# Display the plane's current state
+function printPlane() {
+  for ((y=0;y<numRows;y++)) do
+    for ((x=0;x<numCols;x++)) do
+      echo -n "${planeState[$x,$y]}"
+    done
+    echo
+  done
+}
+function printNextPlane() {
+  for ((y=0;y<numRows;y++)) do
+    for ((x=0;x<numCols;x++)) do
+      echo -n "${nextPlaneState[$x,$y]}"
+    done
+    echo
+  done
+}
+
+#
+# Get the coords of the first seat, in a direction, that's not floor
+function getNeighbour() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local xMod="${3}"
+  local yMod="${4}"
+
+}
+
+#
+# Take a seat's coords, and return a list of neighbours' coords
+function getNeighbours() {
+  local xPos="${1}"
+  local yPos="${2}"
+
+  # 1 Step in each of 8 cardinal directions:
+  local -a coordMods
+  coordMods[${#coordMods[@]}]=" 0 -1" # Up
+  coordMods[${#coordMods[@]}]=" 1 -1" # Up-Right
+  coordMods[${#coordMods[@]}]=" 1  0" # Right
+  coordMods[${#coordMods[@]}]=" 1  1" # Down-Right
+  coordMods[${#coordMods[@]}]=" 0  1" # Down
+  coordMods[${#coordMods[@]}]="-1  1" # Down-Left
+  coordMods[${#coordMods[@]}]="-1  0" # Left
+  coordMods[${#coordMods[@]}]="-1 -1" # Up-Left
+  local neighbours=$(
+    for coordMod in "${coordMods[@]}"; do
+      read xMod yMod <<<"${coordMod}"
+      local x=${xPos}
+      local y=${yPos}
+      while true; do
+        x=$(( x + xMod ))
+        y=$(( y + yMod ))
+        # Don't read outside the plane - walls count as "empty"
+        [[ "${x}" -lt 0 ]] && continue 2
+        [[ "${x}" -ge "${numCols}" ]] && continue 2
+        [[ "${y}" -lt 0 ]] && continue 2
+        [[ "${y}" -ge "${numRows}" ]] && continue 2
+        # Floors don't count - keep looking in that direction
+        [[ ${planeState[${x},${y}]} == '.' ]] && continue
+        # Not exiting means we found a seat
+        echo "${x} ${y}"
+        break
+      done
+    done &
+    wait $(jobs -p)
+  )
+  echo "${neighbours}"
+}
+
+#
+# Take a seat's coords, return whether it's empty or not
+# "Floor" spaces are considered empty.
+function isOccupied() {
+  local xPos="${1}"
+  local yPos="${2}"
+  case "${planeState[${xPos},${yPos}]}" in
+    'L') return 1;;
+    '#') return 0;;
+    '.') return 1;;
+  esac
+  return 2
+}
+
+#
+# Given a seat's coords, return how many neighbouring seats are occupied
+function countOccupiedNeighbours() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local neighbourCoords="$( getNeighbours "${xPos}" "${yPos}" )"
+  local occupiedNeighbours=0
+  while read x y; do
+    if isOccupied "${x}" "${y}"; then
+      occupiedNeighbours=$(( occupiedNeighbours+1 ))
+    fi
+  done <<<"${neighbourCoords}"
+  echo "${occupiedNeighbours}"
+}
+
+#
+# Given a seat's coords, figure out its next state
+function getNextState() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local oldState="${planeState[${xPos},${yPos}]}"
+
+  case "${oldState}" in
+    'L') # Empty seat logic
+      # If a seat is empty (L) and there are no occupied
+      #   seats adjacent to it, the seat becomes occupied.
+      if [[ $(countOccupiedNeighbours ${xPos} ${yPos}) -eq 0 ]]; then
+        echo '#'
+      else
+        echo 'L'
+      fi
+    ;;
+    '#') # Occupied seat logic
+      # If a seat is occupied (#) and four or more seats
+      #    adjacent to it are also occupied, the seat
+      #    becomes empty.
+      if [[ $(countOccupiedNeighbours ${xPos} ${yPos}) -ge 5 ]]; then
+        echo 'L'
+      else
+        echo '#'
+      fi
+    ;;
+    '.') # Floors will always be floors
+      echo "${oldState}"
+    ;;
+  esac
+
+  # Occupied seat logic:
+}
+
+#
+# Copy nextPlaneState into planeState
+function changeSeats() {
+  for ((y=0;y<numRows;y++)) do
+    for ((x=0;x<numCols;x++)) do
+      planeState[${x},${y}]=${nextPlaneState[${x},${y}]}
+    done
+  done
+}
+
+#
+# Check whether we're staged to change seats
+function seatsChanging() {
+  for ((y=0;y<numRows;y++)) do
+    for ((x=0;x<numCols;x++)) do
+      if [[ "${planeState[${x},${y}]}" != "${nextPlaneState[${x},${y}]}" ]]; then
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
+
+#----------------#
+#---Core logic---#
+#----------------#
+
+debug "Num Rows: ${numRows}"
+debug "Num Cols: ${numCols}"
+
+iteration=0
+declare -A nextPlaneState
+while true; do
+  debug "Current state of plane:"
+  printPlane
+
+  iteration=$(( iteration + 1 ))
+  debug "Running iteration #${iteration}"
+  
+  # Have each seat figure out its next state
+  # Note: This could be parallelized
+  seatsChanging="False"
+  for ((y=0;y<numRows;y++)) do
+    for ((x=0;x<numCols;x++)) do
+        nextState=$( getNextState ${x} ${y} )
+        nextPlaneState[${x},${y}]=${nextState}
+        if [[ "${planeState[${x},${y}]}" != "${nextState}" ]]; then
+          seatsChanging="True"
+        fi
+    done
+  done
+
+  # If no seats want to change, we're stable - exit the loop
+  #if [[ "${seatsChanging}" == "False" ]]; then
+  if ! seatsChanging; then
+    break
+  fi
+
+  # Any seat that wants to change, should do so now:
+  changeSeats
+done
+
+
+occupiedSeats=0
+for ((y=0;y<numRows;y++)) do
+  for ((x=0;x<numCols;x++)) do
+    if [[ "${planeState[${x},${y}]}" == "#" ]]; then
+      occupiedSeats=$(( occupiedSeats + 1 ))
+    fi
+  done
+done
+
+echo "Total occupied: ${occupiedSeats}"
+

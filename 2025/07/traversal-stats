@@ -1,0 +1,11 @@
+rsahoward@coyote /git/github.com/stafdehat/adventofcode/2025/07 $ for x in $( seq 10 10 60 ); do
+>   echo -n "${x} lines: "
+>   { time ./2.sh <(head -n ${x} data); } 2>&1 >/dev/null | sed -n 's/user//p'
+> done
+10 lines: 	0m0.009s
+20 lines: 	0m0.013s
+30 lines: 	0m0.042s
+40 lines: 	0m0.203s
+50 lines: 	0m1.531s
+60 lines: 	0m13.683s
+rsahoward@coyote /git/github.com/stafdehat/adventofcode/2025/07 $ 

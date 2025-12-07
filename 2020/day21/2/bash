@@ -1,0 +1,82 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+
+inFile="${1}"
+
+rm -rf links
+mkdir links
+
+while read LINE; do
+  allergens=( $( grep -Po '\(contains .*' <<<"${LINE}" | cut -d\  -f2- | tr -d '),' ) )
+  ingredients=( $( cut -d\( -f1 <<<"${LINE}" ) )
+  for allergen in "${allergens[@]}"; do
+    for ingredient in "${ingredients[@]}"; do
+      echo "${ingredient}" >> links/"${allergen}"
+    done
+  done
+done < "${inFile}"
+
+unset allergens
+allergens=( $(
+  cut -d\( -f2- "${inFile}" | tr -d ',)' | tr ' ' '\n' |
+    sort -u | grep -v contains
+) )
+unset mentions
+declare -A mentions
+for allergen in "${allergens[@]}"; do
+  mentions[${allergen}]=$( grep -Po "\s${allergen}(,|\))" "${inFile}" | wc -l )
+done
+
+
+known=0
+legend=$( mktemp )
+while [[ ${known} -lt ${#allergens[@]} ]]; do
+  for allergen in "${allergens[@]}"; do
+    # If we already know it, skip it:
+    grep -qP "^\s*${allergen} is" "${legend}" && continue
+
+    debug "${allergen} is mentioned ${mentions[${allergen}]} times"
+    possibilities=$( 
+      cat links/${allergen} | sort | uniq -c |
+        awk '$1 == '${mentions[${allergen}]}' {print $2}'
+    )
+    debug "${allergen} could be: " ${possibilities}
+    if [[ $( wc -l <<<"${possibilities}" ) -le 1 ]]; then
+      debug "${allergen} is ${possibilities}"
+      echo "${allergen} is ${possibilities}" >>"${legend}"
+      sed -i "/^\s*${possibilities}\s*$/d" links/*
+      known=$((known+1))
+    fi
+  done
+done
+
+unset allergens
+unset ingredients
+declare -a allergens
+declare -a ingredients
+while read allergen delim ingredient; do
+  allergens[${#allergens[@]}]="${allergen}"
+  ingredients[${#ingredients[@]}]="${ingredient}"
+done < "${legend}"
+
+
+list=$( cut -d\( -f1 "${inFile}" | tr ' ' '\n' | grep -vP '^\s*$' )
+for ingredient in ${ingredients[@]}; do
+  list=$( grep -v "^${ingredient}$" <<<"${list}" )
+done
+wc -l <<<"${list}"
+
+
+x=0
+while [[ "${x}" -lt ${#allergens[@]} ]]; do
+  debug "${allergens[${x}]} == ${ingredients[${x}]}"
+  echo "${allergens[${x}]} ${ingredients[${x}]}"
+  x=$((x+1))
+done | sort | awk '{print $2}' | xargs echo | tr ' ' ','
+
+

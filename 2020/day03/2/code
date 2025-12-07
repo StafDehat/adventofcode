@@ -1,0 +1,96 @@
+#!/bin/bash
+
+inFile="${1}"
+#DEBUG="True"
+
+# Ideally, hill would be a 2d array
+#   Sadly, multidimensional arrays don't exist in BASH
+#   So, we'll use a Hash instead.  Things might get weird.
+declare -A hill
+numCols=$( head -n 1 "${inFile}" | tr -d '\n' | wc -c )
+numRows=$( wc -l < "${inFile}" )
+colNum=0
+rowNum=0
+while read LINE; do
+  colNum=0
+  while read -n1 char; do
+    hill[${colNum},${rowNum}]="${char}"
+    colNum=$((colNum+1))
+  done <<<"${LINE}"
+  rowNum=$((rowNum+1))
+done < <( cat "${inFile}" )
+
+function printHill() {
+  for ((y=0;y<numRows;y++)) do
+    for ((x=0;x<numCols;x++)) do
+      echo -n "${hill[$x,$y]}"
+    done
+    echo
+  done
+}
+#printHill
+
+function debug() {
+  local ts=$( date +"%F_%T.%N" )
+  [[ "${DEBUG}" == "True" ]] || return
+  echo "${ts}: ${@}" >&2
+}
+
+# Take whitespace-separated, whole-number input from either 
+#   arguments or STDIN, and calculate the product.
+function product() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "1";
+    for x in ${input}; do
+      echo -n " * ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+#
+# Count trees along a given slope down the pre-defined "hill"
+#   Usage: countTrees HorizontalMovement VerticalMovement
+#   Example: countTrees 3 1
+function countTrees() {
+  # Define the slope we're taking down the hill
+  local xStep="${1}"
+  local yStep="${2}"
+
+  # We start in the top-left, which will be (0,0)
+  local xPos=0
+  local yPos=0
+
+  local trees=0
+
+  # When yPos == numRows, we'll have gone *past* the last 
+  #   row, since yPos=0 is Row 1
+  while [[ "${yPos}" -lt "${numRows}" ]]; do
+    # Check if we're at a tree
+    if [[ "${hill[${xPos},${yPos}]}" == "#" ]]; then
+      debug "Hit a tree at ${xPos},${yPos}"
+      trees=$((trees+1))
+    fi
+    # Calculate where we'll be next
+    yPos=$(( yPos + yStep ))
+    # Since the "hill" repeats infinitely, horizontally, loop back on self as necessary:
+    xPos=$(( ( xPos + xStep ) % numCols ))
+  done
+
+  echo "${trees}"
+}
+
+
+product $( countTrees 1 1 ) \
+        $( countTrees 3 1 ) \
+        $( countTrees 5 1 ) \
+        $( countTrees 7 1 ) \
+        $( countTrees 1 2 )
+
+

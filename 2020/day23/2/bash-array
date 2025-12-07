@@ -1,0 +1,117 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function printCupsFromTo() {
+  local startCup="${1}"
+  local stopCup="${2}"
+  [[ ${startCup} -eq ${stopCup} ]] && return
+  echo "${startCup}"
+  printCupsFromTo ${next[${startCup}]} ${stopCup}
+}
+function printCupsFrom() {
+  local startCup="${1}"
+  echo "${startCup}"
+  printCupsFromTo ${next[${startCup}]} ${startCup}
+}
+function printTwoCupsFrom() {
+  local startCup="${1}"
+  local first=${next[${startCup}]}
+  local second=${next[${first}]}
+  echo "Following cup ${startCup}: ${first} ${second}"
+}
+
+function getDest() {
+  local dest=$(( ${1}-1 ))
+  local pickup1=${2}
+  local pickup2=${3}
+  local pickup3=${4}
+  while true; do
+    # If dest-1 took us under 1, wrap to max
+    if [[ ${dest} -le 0 ]]; then
+      dest=${numCups}
+    fi
+    # As long as our ideal cup isn't picked up, we're good:
+    if [[ ${dest} -ne ${pickup1} ]] &&
+       [[ ${dest} -ne ${pickup2} ]] &&
+       [[ ${dest} -ne ${pickup3} ]]; then
+      break
+    fi
+    dest=$((dest-1))
+  done
+  echo "${dest}"
+}
+
+function move() {
+  #local current # Global, actually
+  local pickup1=${next[${current}]}
+  local pickup2=${next[${pickup1}]}
+  local pickup3=${next[${pickup2}]}
+  local postPickup=${next[${pickup3}]}
+  local dest=$( getDest ${current} ${pickup1} ${pickup2} ${pickup3} )
+  local postDest=${next[${dest}]}
+
+  # Remove picked-up cups from the sequence
+  next[${current}]=${postPickup}
+
+  # Insert picked-up cups between dest & postDest
+  next[${dest}]=${pickup1}
+  next[${pickup3}]=${postDest}
+
+  # Update the 'current' cup
+  current=${next[${current}]}
+}
+
+
+inFile="${1}"
+#numCups=$( grep -Po '\d' ${inFile} | wc -l )
+numCups=1000000
+numMoves=100
+
+unset next cupInput
+declare -a next
+
+declare -a cupInput
+cupInput=( $( grep -Po '\d' "${inFile}" ) )
+
+
+# Build the linked-list associations
+index=0
+while [[ ${index} -lt ${#cupInput[@]} ]]; do
+  cup=${cupInput[${index}]}
+  next[${cup}]=${cupInput[$(( (${index}+1)%${#cupInput[@]} ))]}
+  index=$((index+1))
+done
+#debug "Num Cups: ${numCups}"
+if [[ ${numCups} -gt ${#cupInput[@]} ]]; then
+  #debug "Adding more cups"
+  cup=${index}
+  while [[ ${cup} -lt ${numCups} ]]; do
+    cup=$((cup+1))
+    next[${cup}]=$((cup+1))
+  done
+  # Fix the edge cases:
+  #   The 9th cup (at pos8) & Cup10 point at each other:
+  next[${cupInput[8]}]=10
+  #   The first cup (at pos0) & last cup (numCups) point at each other:
+  next[${numCups}]=${cupInput[0]}
+fi
+
+moveCount=0
+current=${cupInput[0]}
+while [[ ${moveCount} -lt ${numMoves} ]]; do
+  move
+  moveCount=$((moveCount+1))
+  # Report every 1,000 moves:
+  [[ $(( moveCount%1000 )) -eq 0 ]] && debug "${moveCount} moves completed"
+done
+
+echo "After ${moveCount} moves: "
+printCupsFrom 1 | xargs echo
+printTwoCupsFrom 1
+
+
+

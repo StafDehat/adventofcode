@@ -1,0 +1,143 @@
+#!/bin/bash
+
+function debug() {
+  echo "${@}" >&2
+}
+
+function printCupsFromTo() {
+  local startCup="${1}"
+  local stopCup="${2}"
+  echo "${startCup}"
+  [[ ${startCup} -eq ${stopCup} ]] && return
+  printCupsFromTo ${next[${startCup}]} ${stopCup}
+}
+function printCupsFrom() {
+  local startCup="${1}"
+  printCupsFromTo ${startCup} ${prev[${startCup}]}
+}
+function printTwoCupsFrom() {
+  local startCup="${1}"
+  local first=${next[${startCup}]}
+  echo ${first}
+  echo ${next[${first}]}
+}
+
+function getDest() {
+  local dest=${1}
+  while true; do
+    dest=$((dest-1))
+    if [[ ${dest} -le 0 ]]; then
+      dest=${numCups}
+    fi
+    # As long as our ideal cup isn't picked up, we're good:
+    if ! grep -qP "(^|\s)${dest}(\s|$)" <<<"${pickup[@]}"; then
+      break
+    fi
+  done
+  echo "${dest}"
+}
+
+function move() {
+  local -a pickup
+  local dest
+  local tmp
+
+  #debug "current: ${current}"
+
+  # Note which 3 Cups are being picked up
+  pickup[0]=${next[${current}]}
+  pickup[1]=${next[${pickup[0]}]}
+  pickup[2]=${next[${pickup[1]}]}
+  #debug "Picked up 3 cups: " ${pickup[@]}
+
+  #debug "pick up: " ${pickup[@]}
+
+  # current <> pickup[2]/next
+  #   Update the current cup's "next"
+  next[${current}]=${next[${pickup[2]}]}
+  #   Reciprocate
+  prev[${next[${current}]}]=${current}
+
+  # Figure out the destination cup
+  dest=$( getDest ${current} )
+  #debug "destination: ${dest}"
+  #debug "Identified next cup as ${dest}"
+
+  # Insert picked-up cups, by making 2 cups point at them
+  # pickup[2] <> dest/next
+  #   Update pickup[2]'s next
+  tmp=${next[${dest}]}
+  next[${pickup[2]}]=${tmp}
+  #   Reciprocate
+  prev[${tmp}]=${pickup[2]}
+
+  # dest <> pickup[0]
+  #   Update dest's next
+  next[${dest}]=${pickup[0]}
+  #   Reciprocate
+  prev[${pickup[0]}]=${dest}
+
+  # Report the new "current"
+  current=${next[${current}]}
+}
+
+
+inFile="${1}"
+numCups=$( grep -Po '\d' ${inFile} | wc -l )
+numMoves=100
+
+unset next prev cups
+declare -a next
+declare -a prev
+
+declare -a cups
+cups=( $( grep -Po '\d' "${inFile}" ) )
+
+
+# Build the linked-list associations
+index=0
+while [[ ${index} -lt ${#cups[@]} ]]; do
+  cup=${cups[${index}]}
+  next[${cup}]=${cups[$(( (${index}+1)%${#cups[@]} ))]}
+  prev[${cup}]=${cups[$(( (${index}-1)%${#cups[@]} ))]}
+  index=$((index+1))
+done
+#debug "Num Cups: ${numCups}"
+#debug "Cups#: ${#cups[@]}"
+if [[ ${numCups} -gt ${#cups[@]} ]]; then
+  #debug "Adding more cups"
+  cup=${index}
+  while [[ ${cup} -lt ${numCups} ]]; do
+    cup=$((cup+1))
+    next[${cup}]=$((cup+1))
+    prev[${cup}]=$((cup-1))
+  done
+  # Fix the edge cases:
+  #   The 9th cup (at pos8) & Cup10 point at each other:
+  next[${cups[8]}]=10
+  prev[10]=${cups[8]}
+  #   The first cup (at pos0) & last cup (numCups) point at each other:
+  next[${numCups}]=${cups[0]}
+  prev[${cups[0]}]=${numCups}
+fi
+
+moves=0
+current=${cups[0]}
+while [[ ${moves} -lt ${numMoves} ]]; do
+  moves=$((moves+1))
+  #debug "-- move ${moves} --"
+  #debug "cups:" $(printCupsFrom 3)
+
+  [[ $(( moves%1000 )) -eq 0 ]] && debug "Starting move #${moves}"
+  move
+done
+
+echo -n "After ${numMoves} moves: "
+printCupsFrom 1 | xargs echo
+#printTwoCupsFrom 1
+
+#printCupsFrom . 1 | xargs echo
+#printCupsFrom . 1 | xargs echo | tr -d ' 1'
+#printCupsFrom . 5 | xargs echo
+
+

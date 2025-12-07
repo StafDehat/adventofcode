@@ -1,0 +1,67 @@
+#!/bin/bash
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function tokenize() {
+  local expr="${@}"
+  grep -Po '(\d+|\+|\*|\(|\))' <<<"${expr}"
+}
+
+# Basic syntax of our "language":
+# expr:
+#   literal
+#   parens
+#   expr op expr
+# literal:
+#   \d+
+# op:
+#   + or *
+# parens:
+#   ( expr )
+
+function parseExpr() {
+  local expr="${@}"
+  expr=( $( tokenize "${expr}" ) )
+
+  nextToken="${expr[0]}"
+  case "${nextToken}" in
+    '(') # Start a grouping by forking a function
+      
+    ;;
+    *) # Must be a number - that's all else there is
+      
+    ;;
+  esac
+}
+
+
+function add() {
+
+}
+
+function mult() {
+
+}
+
+
+
+inFile="${1}"
+
+while read LINE; do
+  parse "${LINE}"
+done # | sum
+

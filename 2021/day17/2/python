@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def display():
+  return
+#end display()
+
+def inTarget(xPos,yPos):
+  if xPos < targetMinX:
+    return False
+  if xPos > targetMaxX:
+    return False
+  if yPos < targetMinY:
+    return False
+  if yPos > targetMaxY:
+    return False
+  return True
+#end inTarget()
+
+def pastTarget(xPos,yPos):
+  if xPos > targetMaxX:
+    return True
+  if yPos < targetMinY:
+    return True
+  return False
+#end pastTarget()
+
+# Unnecessary.  Our lower bound is the minX
+#   that'll still reach targetMinX.
+#def shortTarget(xPos,xVel):
+#  if xPos
+##end shortTarget()
+
+def hitsTarget(xVel,yVel):
+  xPos=0
+  yPos=0
+  while True:
+    # The probe's x position increases by its x velocity.
+    # The probe's y position increases by its y velocity.
+    # X velocity trends 1 toward the value 0
+    # Due to gravity, the probe's y velocity decreases by 1.
+    xPos += xVel
+    yPos += yVel
+    if xVel > 0:
+      xVel -= 1
+    yVel -= 1
+    #print("Pos:",xPos,yPos,"Speed:",xVel,yVel)
+    if inTarget(xPos,yPos):
+      return True
+    if pastTarget(xPos,yPos):
+      return False
+    #if shortTarget(xPos,xVel):
+    #  return False
+  #end while
+  return
+#end simulate()
+
+def getMinXVel(targetMinX, targetMaxX):
+  vel = 1
+  while True:
+    # Gauss' formula:
+    # (n / 2)(first number + last number)
+    dist = int((vel/2)*(1+vel))
+    if dist >= targetMinX:
+      return vel
+    if dist > targetMaxX:
+      raise IndexError
+    vel += 1
+  #end while
+#end getMinXVel()
+
+
+
+# The probe's x,y position starts at 0,0
+# Target area:
+targetMinX=int(lines[0].split('=')[1].split('.')[0])
+targetMaxX=int(lines[0].split('=')[1].split('.')[2].split(',')[0])
+targetMinY=int(lines[0].split('=')[2].split('.')[0])
+targetMaxY=int(lines[0].split('=')[2].split('.')[2])
+
+
+# Some bounds:
+# 5995 is highest possible yPos, from 109 yVel
+maxYVel = abs(targetMinY) - 1 #ie:109
+# Spike straight to the lowest part of target
+minYVel = targetMinY
+minYVel = int((minYVel)/2)
+# Spike straight to the furthest part of target
+maxXVel = targetMaxX
+maxXVel = int((maxXVel+1)/2)+1
+# Barely drift to the closest part of target
+minXVel = getMinXVel(targetMinX,targetMaxX)
+
+print("Initial X range:","%d..%d"%(minXVel,maxXVel),"(%d values)"%(maxXVel-minXVel+1))
+print("Initial Y range:","%d..%d"%(minYVel,maxYVel),"(%d values)"%(maxYVel-minYVel+1))
+
+print("Simulations:", (maxXVel-minXVel+1)*(maxYVel-minYVel+1))
+
+
+total = 0
+
+# Simulate & count everything that takes >=2 steps to reach target
+for xVel in range(minXVel,maxXVel+1):
+  for yVel in range(minYVel,maxYVel+1):
+    #print(xVel,yVel)
+    if hitsTarget(xVel,yVel):
+      total += 1
+      print(xVel,yVel)
+
+# Spiking straight into the target is always a solution:
+for xVel in range(targetMinX,targetMaxX+1):
+  for yVel in range(targetMinY,targetMaxY+1):
+    print(xVel,yVel)
+
+print(total + (targetMaxX-targetMinX+1)*(targetMaxY-targetMinY+1))
+

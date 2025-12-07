@@ -1,0 +1,94 @@
+#!/bin/bash
+
+inFile="${1}"
+
+myStart=$( head -n 1 "${inFile}" | grep -Po '\d+' )
+declare -a busIds
+departures=( $( grep ',' ${inFile} |
+                  grep -Po '(\d+|x),?' |
+                  tr -d ',' ) )
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo -e "${ts}: ${@}" >&2
+}
+
+function gcd() {
+  if (( ${2} == 0 )); then
+    echo 0; return
+  fi
+  if (( ${1} % ${2} == 0)); then
+    echo ${2}
+    return
+  fi
+  gcd ${2} $(( ${1} % ${2} ))
+}
+
+# Least-common multiple
+function lcm() {
+  if (( ${2} == 0 )); then
+    echo 0; return
+  fi
+  if (( ${#} == 2 )); then
+    echo $(( ${1} * ${2} / $( gcd ${1} ${2} ) ))
+    return
+  elif (( ${#} <= 1 )); then
+    echo ${1}
+    return
+  fi
+  local a=${1}
+  shift 1
+  lcm ${a} $( lcm ${@} )
+}
+
+
+# Indexed by busID, offsets from t=0
+declare -a offsets
+index=0
+for busId in ${departures[@]}; do
+  debug "t+${index}:\t${busId}"
+  [[ "${busId}" != "x" ]] && offsets[${busId}]=${index}
+  index=$(( index+1 ))
+done
+debug "Minutes modded by: ${#departures[@]}"
+
+
+# Whatever bus departs at t=0, the solution will be a multiple of that
+tZeroBus=${departures[0]}
+debug "Solution must be a multiple of ${tZeroBus}"
+
+# Calculate the minimum-valid increase per check
+declare -a incrs
+incrs=$( 
+  echo "${tZeroBus}"
+  for busId in "${departures[@]}"; do
+    [[ "${busId}" == "x" ]] && continue
+    echo $(( ( busId/tZeroBus ) * tZeroBus ))
+  done | sort -nu
+)
+incr=$( lcm ${incrs[@]} )
+debug "Suggested increment: ${incr}"
+
+read -p "About to start the big loop"
+
+incr=${tZeroBus}
+t=${tZeroBus}
+x=0
+while true; do
+  x=$((x+1))
+  t=$(( t + incr ))
+  debug "Testing t=${t}"
+  for busId in "${departures[@]}"; do
+    [[ "${busId}" == "x" ]] && continue
+    #debug "If t=${t}, then BusID ${busId} departs at t=$((t%busId))"
+    if [[ $(( ( t+${offsets[${busId}]} ) % busId )) -eq 0 ]]; then
+      debug "Bus ${busId} would leave at the correct time."
+    else
+      debug "Bus ${busId} needs to leave at t=+${offsets[${busId}]}, but would actually be $(( ( t+${offsets[${busId}]} ) % busId ))"
+      continue 2
+    fi
+  done
+  break
+done
+
+

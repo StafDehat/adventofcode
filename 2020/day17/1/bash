@@ -1,0 +1,303 @@
+#!/bin/bash
+
+inFile="${1}"
+
+#
+# Helper functions
+#
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function printPocket() {
+  local cubeState
+  for z in $( seq ${zMin} ${zMax} ); do
+    echo
+    echo "Z=${z}:"
+    for y in $( seq ${yMin} ${yMax} ); do
+      echo -n "Row${y}: "
+      for x in $( seq ${xMin} ${xMax} ); do
+        cubeState=${pocketState[$x,$y,$z]}
+        echo -n "${cubeState:-0}"
+      done
+      echo
+    done
+  done
+}
+
+function getNeighbours() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local zPos="${3}"
+
+  for x in $(seq $((xPos-1)) $((xPos+1))); do
+    for y in $(seq $((yPos-1)) $((yPos+1))); do
+      for z in $(seq $((zPos-1)) $((zPos+1))); do
+        # I'm not my own neighbour:
+        if [[ "${y}" -eq "${yPos}" ]] &&
+           [[ "${x}" -eq "${xPos}" ]] &&
+           [[ "${z}" -eq "${zPos}" ]]; then
+          continue
+        fi
+        echo "${x} ${y} ${z}"
+      done
+    done
+  done
+}
+
+function isActive() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local zPos="${3}"
+
+  # All cubes outside our purview are inactive:
+  #[[ ${xPos} -lt ${xMin} ]] && return 1
+  #[[ ${yPos} -lt ${yMin} ]] && return 1
+  #[[ ${zPos} -lt ${zMin} ]] && return 1
+  #[[ ${xPos} -gt ${xMax} ]] && return 1
+  #[[ ${yPos} -gt ${yMax} ]] && return 1
+  #[[ ${zPos} -gt ${zMax} ]] && return 1
+  [[ -z "${pocketState[${xPos},${yPos},${zPos}]}" ]] && return 1
+
+  # If it's inactive, also return 1 (false/fail)
+  [[ ${pocketState[${xPos},${yPos},${zPos}]} -eq 0 ]] && return 1
+
+  # All invalid exhausted - return 0 (true/success)
+  return 0
+}
+
+function countActiveNeighbours() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local zPos="${3}"
+  
+  local neighbourCoords="$( getNeighbours ${xPos} ${yPos} ${zPos} )"
+  # Taking advantage of 0=inactive, 1=active
+  while read x y z; do
+    echo "${pocketState[${x},${y},${z}]}"
+  done <<<"${neighbourCoords}" | sum
+}
+
+
+function getNextState() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local zPos="${3}"
+  local activeNeighbours=$(countActiveNeighbours ${xPos} ${yPos} ${zPos})
+
+  #debug "Calculating next state of ${xPos},${yPos},${zPos} (${activeNeighbours} active neighbours)"
+
+  if isActive ${xPos} ${yPos} ${zPos}; then
+    # If a cube is active and exactly 2 or 3 of its neighbors are also active, the cube remains active. Otherwise, the cube becomes inactive.
+    if [[ ${activeNeighbours} -eq 2 ]] ||
+       [[ ${activeNeighbours} -eq 3 ]]; then
+      echo 1
+    else
+      echo 0
+    fi
+  else
+    # If a cube is inactive but exactly 3 of its neighbors are active, the cube becomes active. Otherwise, the cube remains inactive.
+    if [[ ${activeNeighbours} -eq 3 ]]; then
+      echo 1
+    else
+      echo 0
+    fi
+  fi
+}
+
+function changeState() {
+  debug "Updating Pocket state."
+  debug "New dimensions:"
+  debug "X: ${xMin} to ${xMax}"
+  debug "Y: ${yMin} to ${yMax}"
+  debug "Z: ${zMin} to ${zMax}"
+  for z in $(seq ${zMin} ${zMax}); do
+    for y in $(seq ${yMin} ${yMax}); do
+      for x in $(seq ${xMin} ${xMax}); do
+        pocketState[${x},${y},${z}]=${nextPocketState[${x},${y},${z}]}
+      done
+    done
+  done
+}
+
+function trimBoundaries() {
+  local shrinkable
+
+  # Attempt to narrow X coords:
+  shrinkable="True"
+  for z in $(seq ${zMin} ${zMax}); do
+    for y in $(seq ${yMin} ${yMax}); do
+      if isActive ${xMin} ${y} ${z}; then
+        shrinkable="False"
+        break 2
+      fi
+    done
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "X layer ${xMin} is *all* inactive - removing that whole layer"
+    xMin=$(( xMin+1 ))
+  fi
+  # Attempt to narrow X coords:
+  shrinkable="True"
+  for z in $(seq ${zMin} ${zMax}); do
+    for y in $(seq ${yMin} ${yMax}); do
+      if isActive ${xMax} ${y} ${z}; then
+        shrinkable="False"
+        break 2
+      fi
+    done
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "X layer ${xMax} is *all* inactive - removing that whole layer"
+    xMax=$(( xMax-1 ))
+  fi
+
+  # Attempt to narrow Y coords:
+  shrinkable="True"
+  for x in $(seq ${xMin} ${xMax}); do
+    for z in $(seq ${zMin} ${zMax}); do
+      if isActive ${x} ${yMin} ${z}; then
+        shrinkable="False"
+        break 2
+      fi
+    done
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "Y layer ${yMin} is *all* inactive - removing that whole layer"
+    yMin=$(( yMin+1 ))
+  fi
+  shrinkable="True"
+  for x in $(seq ${xMin} ${xMax}); do
+    for z in $(seq ${zMin} ${zMax}); do
+      if isActive ${x} ${yMax} ${z}; then
+        shrinkable="False"
+        break 2
+      fi
+    done 
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "Y layer ${yMax} is *all* inactive - removing that whole layer"
+    yMax=$(( yMax-1 ))
+  fi
+
+  # Attempt to narrow Z coords:
+  shrinkable="True"
+  for x in $(seq ${xMin} ${xMax}); do
+    for y in $(seq ${yMin} ${yMax}); do
+      if isActive ${x} ${y} ${zMin}; then
+        shrinkable="False"
+        break 2
+      fi
+    done
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "Z layer ${zMin} is *all* inactive - removing that whole layer"
+    zMin=$(( zMin+1 ))
+  fi
+  shrinkable="True"
+  for x in $(seq ${xMin} ${xMax}); do
+    for y in $(seq ${yMin} ${yMax}); do
+      if isActive ${x} ${y} ${zMax}; then
+        shrinkable="False"
+        break 2
+      fi
+    done
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "Z layer ${zMax} is *all* inactive - removing that whole layer"
+    zMax=$(( zMax-1 ))
+  fi
+}
+
+
+#----------------#
+#---Core logic---#
+#----------------#
+
+# This thing grows dynamically, so we need to track our coordinate bounds:
+xMin=0
+xMax=$(( $( head -n 1 "${inFile}" | tr -d '\n' | wc -c ) - 1 ))
+yMin=0
+yMax=$(( $( wc -l < "${inFile}" ) - 1 ))
+zMin=0
+zMax=0
+
+declare -A pocketState
+xPos=0
+yPos=0
+zPos=0
+while read LINE; do
+  # 0 = Inactive
+  # 1 = Active
+  xPos=0
+  while read -n1 char; do
+    if [[ "${char}" == "#" ]]; then
+      pocketState[${xPos},${yPos},${zPos}]=1
+    else
+      pocketState[${xPos},${yPos},${zPos}]=0
+    fi
+    xPos=$((xPos+1))
+  done <<<"${LINE}"
+  yPos=$((yPos+1))
+done < <( cat "${inFile}" )
+
+debug "Start state:"
+printPocket
+
+declare -A nextPocketState
+for iteration in {1..6}; do
+  trimBoundaries
+
+  # Decrement min
+  xMin=$((xMin-1))
+  yMin=$((yMin-1))
+  zMin=$((zMin-1))
+  # Increment max
+  xMax=$((xMax+1))
+  yMax=$((yMax+1))
+  zMax=$((zMax+1))
+
+  # Have each cube figure out its next state
+  # Note: This could be parallelized
+  for z in $(seq ${zMin} ${zMax}); do
+    #debug "Calculating z=${z}"
+    for y in $(seq ${yMin} ${yMax}); do
+      for x in $(seq ${xMin} ${xMax}); do
+        nextState=$( getNextState ${x} ${y} ${z} )
+        nextPocketState[${x},${y},${z}]=${nextState}
+      done
+    done
+  done
+
+  # Copy nextPocketState into pocketState
+  changeState
+
+  debug "After ${iteration} iterations: $(echo "${pocketState[@]}" | sum)"
+  printPocket
+  #echo "${pocketState[@]}" | sum
+done
+
+
+# Count the actives:
+printPocket
+echo "${pocketState[@]}" | sum
+
+

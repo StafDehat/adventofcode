@@ -1,0 +1,43 @@
+#!/bin/bash
+
+if [[ ${#} -ne 1 ]]; then
+  echo "Missing argument: Input file" >&2
+  exit 1
+fi
+
+INFILE="${1}"
+if ! [[ -r "${INFILE}" ]]; then
+  echo "Unable to read input file: ${INFILE}" >&2
+  exit 1
+fi
+
+# Define some math libraries:
+. ../../math.bash
+
+
+sum=0
+while read LINE; do
+  echo "Evaluating: ${LINE}"
+  DRAWS=$( cut -d: -f2- <<<"${LINE}" |
+             tr ';' '\n' )
+  GAME=$( cut -d: -f1 <<<"${LINE}" |
+            grep -Po '\d+' )
+  while read DRAW; do
+    echo "Draw: ${DRAW}"
+    red=$( grep -Po '\d+\s+red' <<<"${DRAW}" |
+             grep -Po '\d+' )
+    green=$( grep -Po '\d+\s+green' <<<"${DRAW}" |
+               grep -Po '\d+' )
+    blue=$( grep -Po '\d+\s+blue' <<<"${DRAW}" |
+              grep -Po '\d+' )
+    if [[ ${red} -gt 12 ||
+          ${green} -gt 13 ||
+          ${blue} -gt 14 ]]; then
+      echo "Invalid game: ${GAME}"
+      continue 2
+    fi
+  done <<<"${DRAWS}"
+  sum=$((sum + GAME))
+done < "${INFILE}"
+
+echo "Sum: ${sum}"

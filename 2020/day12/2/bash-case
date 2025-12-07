@@ -1,0 +1,106 @@
+#!/bin/bash
+
+inFile="${1}"
+
+# Ship's coords are absolute, cartesian, from 0,0
+shipXPos=0
+shipYPos=0
+# Point's coords are relative to the ship - ship is 0,0
+pointXPos=10
+pointYPos=1
+
+#
+# Print args to stderr
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function cw() {
+  local degrees="${1}"
+  local tmp
+  degrees=$(( degrees % 360 ))
+  case "${degrees}" in
+    90)
+      tmp=${pointXPos}
+      pointXPos="${pointYPos}"
+      pointYPos=$((tmp*-1))
+    ;;
+    180)
+      pointXPos=$(( pointXPos * -1 ))
+      pointYPos=$(( pointYPos * -1 ))
+    ;;
+    270)
+      tmp=${pointXPos}
+      pointXPos=$(( pointYPos * -1 ))
+      pointYPos=${tmp}
+    ;;
+  esac
+#  for x in $( seq 1 $((degrees/90)) ); do
+#    tmp=${pointXPos}
+#    pointXPos="${pointYPos}"
+#    pointYPos=$((tmp*-1))
+#  done
+}
+
+function ccw() {
+  local degrees="${1}"
+  local tmp
+  degrees=$(( degrees % 360 ))
+  case "${degrees}" in
+    90)
+      tmp=${pointXPos}
+      pointXPos=$(( pointYPos * -1 ))
+      pointYPos=${tmp}
+    ;;
+    180)
+      pointXPos=$(( pointXPos * -1 ))
+      pointYPos=$(( pointYPos * -1 ))
+    ;;
+    270)
+      tmp=${pointXPos}
+      pointXPos="${pointYPos}"
+      pointYPos=$((tmp*-1))
+    ;;
+  esac
+#  for x in $( seq 1 $((degrees/90)) ); do
+#    tmp=${pointXPos}
+#    pointXPos=$(( pointYPos * -1 ))
+#    pointYPos=${tmp}
+#  done
+}
+
+function forward() {
+  local numMoves="${1}"
+  #debug "Moving toward beacon ${numMoves} times"
+  shipXPos=$(( shipXPos + pointXPos*numMoves ))
+  shipYPos=$(( shipYPos + pointYPos*numMoves ))
+}
+
+while read movement; do
+  direction=$( grep -Po '^.' <<<"${movement}" )
+  distance=$( grep -Po '\d+' <<<"${movement}" )
+  #debug "Received instruction: ${direction} ${distance}"
+  case ${direction} in
+    'N') pointYPos=$(( pointYPos + distance ));;
+    'S') pointYPos=$(( pointYPos - distance ));;
+    'E') pointXPos=$(( pointXPos + distance ));;
+    'W') pointXPos=$(( pointXPos - distance ));;
+    'L') ccw "${distance}";;
+    'R') cw  "${distance}";;
+    'F') forward ${distance};;
+  esac
+  #debug "Current ship position: ${shipXPos}, ${shipYPos}"
+  #debug "Current waypoint position: ${pointXPos}, ${pointYPos}"
+done < "${inFile}"
+
+echo "Start position: 0, 0"
+echo "End position:   ${shipXPos}, ${shipYPos}"
+
+shipXPos=$( tr -d '-' <<<"${shipXPos}" )
+shipYPos=$( tr -d '-' <<<"${shipYPos}" )
+
+echo "Manhattan distance: $(( shipXPos + shipYPos ))"
+
+
+

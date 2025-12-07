@@ -1,0 +1,26 @@
+#!/bin/bash
+
+inFile="${1}"
+
+adapters=$( cat "${inFile}" | sort -n )
+
+device=$( echo "${adapters}" | tail -n 1 )
+device=$(( device+3 ))
+
+
+last=0
+diff1=0
+diff3=0
+for x in ${adapters} ${device}; do
+  if [[ $((x-last)) -eq 1 ]]; then
+    diff1=$((diff1+1))
+  elif [[ $((x-last)) -eq 3 ]]; then
+    diff3=$((diff3+1))
+  fi
+  last="${x}"
+done
+
+echo "diff1: ${diff1}"
+echo "diff3: ${diff3}"
+
+echo "Product: $((diff1*diff3))"

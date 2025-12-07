@@ -1,0 +1,69 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function tokenize() {
+  local expr="${@}"
+  grep -Po '(\d+|\+|\*|\(|\))' <<<"${expr}"
+}
+
+
+function parse() {
+  local expr="${@}"
+  local paren=""
+  local parenResult=""
+
+  # If nothing but a number - just return it:
+  if grep -qP '^\s*(-\s*)?\d+\s*$' <<<"${expr}"; then
+    echo "${expr}"
+    return
+  fi
+
+  # If there are parens, recurse until no parens are left:
+  while true; do
+    paren=$( grep -Po '\([^\(\)]*\)' <<<"${expr}" | head -n 1 )
+    [[ -z "${paren}" ]] && break
+    parenResult=$( parse $( sed -r 's/(^\s*\(|\)\s*$)//g' <<<"${paren}" ) )
+    expr="$( sed -r 's/\([^\(\)]*\)/'"${parenResult}"'/' <<<"${expr}" )"
+  done
+
+  # There must be operators (+, *) - do them, left to right
+  expr=( $( tokenize "${expr}" ) )
+  local left="${expr[0]}"
+  local op="${expr[1]}"
+  local right="${expr[2]}"
+  local remains="${expr[@]:3}"
+
+  parse "$(( ${left} ${op} ${right} )) ${remains[@]}"
+}
+
+
+inFile="${1}"
+
+# Disable globbing - '*' means multiplication today
+set -f
+
+while read LINE; do
+  debug "Parsing line: ${LINE}"
+  parse "${LINE}"
+done <"${inFile}" | sum
+

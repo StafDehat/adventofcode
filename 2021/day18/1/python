@@ -1,0 +1,201 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+def display(nums):
+  for num in nums:
+    print(num)
+#end display()
+
+def addition(num1,num2):
+  return reduce([num1,num2])
+#end addition()
+
+def depth(x):
+  #depth = lambda L: isinstance(L, list) and max(map(depth, L))+1
+  if isinstance(x,list):
+    return max(map(depth,x))+1
+  return 0
+#end depth()
+
+def largest(x):
+  if isinstance(x, int):
+    return x
+  return max(map(largest,x))
+#end largest()
+
+def reduce(tree):
+  newTree = tree
+  print("Input:",tree)
+  while True:
+    # If any pair is nested 4-deep, the left-most such pair explodes.
+    # If any regular number is 10 or greater, the leftmost such regular number splits.
+    if willExplode(newTree,0):
+      newTree = explode(newTree,0)
+      # Explode() returns a list, and maybe a tuple to be summed into that list
+      # If there's still a tuple at this top-level, discard it.
+      if type(newTree) is tuple:
+        newTree = newTree[0]
+      print("After explode:",newTree)
+      continue
+    if willSplit(newTree):
+      newTree = split(newTree)
+      print("After split:  ",newTree)
+      continue
+    break
+  #end while
+  return newTree
+#end reduce()
+
+def willExplode(x,curDepth):
+  if depth(x)+curDepth > 4:
+    return True
+  return False
+#end willExplode()
+
+def willSplit(num):
+  if largest(num) >= 10:
+    return True
+  return False
+#end willSplit()
+
+def addToLeft(num,lst):
+  # Get the end-case out of the way first
+  if type(lst) is int:
+    return lst+num
+  # Since not int, we'll have a list
+  left = lst[0]
+  right = lst[1]
+  newLeft = addToLeft(num,left)
+  return [newLeft,right]
+#end addToLeft()
+
+def addToRight(num,lst):
+  # Get the end-case out of the way first
+  if type(lst) is int:
+    return lst+num
+  # Since not int, we'll have a list
+  left = lst[0]
+  right = lst[1]
+  newRight = addToRight(num,right)
+  return [left,newRight]
+#end addToRight()
+
+def explode(x,xDepth):
+  # It's me.  I'm exploding.
+  if depth(x) == 1:
+    return 0,x
+  # x = Int, List, or Tuple
+  # Ints will never be told to explode
+  # Lists, yes
+  # Tuples will return from explode(), but won't themselves explode
+  # Conclusion, assume we were handed a list
+  left = x[0]
+  right = x[1]
+  # Explode the relevant subtree, and handle the result
+  if willExplode(left,xDepth+1):
+    result = explode(left,xDepth+1)
+    # If list, tuple additions were handled in subtrees - just return up the chain.
+    if isinstance(result,list):
+      return [result,right]
+    # Tuple: handle the additions, and possibly return only a list
+    # Left = post-explosion left
+    left = result[0]
+    # The explosion cascades left & right, as addition
+    blast = result[1]
+    leftBlast = blast[0]
+    rightBlast = blast[1]
+    # Add rightBlast to the left-most int in the right tree:
+    right = addToLeft(rightBlast,right)
+    # rightBlast handled - if leftBlast previously handled, drop the tuple
+    if leftBlast == 0:
+      return [left,right]
+    # leftBlast non-zero.  Return the tuple, but set rightBlast=0
+    return [left,right],[leftBlast,0]
+  # We can assume right will explode, since left didn't.
+  # If nothing was gonna explode, we wouldn't have been called.
+  #if willExplode(right,xDepth+1):
+  # Same code as above, just sans-comments:
+  result = explode(right,xDepth+1)
+  if isinstance(result,list):
+    return [left,result]
+  right = result[0]
+  blast = result[1]
+  leftBlast = blast[0]
+  rightBlast = blast[1]
+  left = addToRight(leftBlast,left)
+  if rightBlast == 0:
+    return [left,right]
+  return [left,right],[0,rightBlast]
+#end explode()
+
+def split(x):
+  if isinstance(x,list):
+    left = x[0]
+    right = x[1]
+    if willSplit(left):
+      return [ split(left), right ]
+    else:
+      return [ left, split(right) ]
+    return [left,right]
+  # Must be an int, since not a list
+  if x >= 10:
+    return [int(x/2),int((x+1)/2)]
+#end split()
+
+def magnitude(tree):
+  # Magnitude of int: That int
+  if type(tree) is int:
+    return tree
+  # Magnitude of pair: 3*mag(left)+2*mag(right)
+  left = tree[0]
+  right = tree[1]
+  return 3*magnitude(left) + 2*magnitude(right)
+#end magnitude()
+
+
+
+import ast
+nums = []
+for line in lines:
+  nums.append(ast.literal_eval(line))
+#end for
+
+solution = nums[0]
+for num in nums[1:]:
+  solution = addition(solution,num)
+print("Magnitude:", magnitude(solution))
+

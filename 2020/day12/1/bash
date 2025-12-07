@@ -1,0 +1,84 @@
+#!/bin/bash
+
+inFile="${1}"
+
+xPos=0
+yPos=0
+facing=E
+
+#
+# Print args to stderr
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function getcw() {
+  local degrees="${1}"
+  local fromDir="${2}"
+  local result="${fromDir}"
+  #debug "Rotating ${degrees} degrees CW from ${fromDir}"
+  for x in $( seq 1 $((degrees/90)) ); do
+    case "${result}" in
+      'N') result=E;;
+      'S') result=W;;
+      'E') result=S;;
+      'W') result=N;;
+    esac
+  done
+  echo "${result}"
+}
+
+function getccw() {
+  local degrees="${1}"
+  local fromDir="${2}"
+  local result="${fromDir}"
+  #debug "Rotating ${degrees} degrees CCW from ${fromDir}"
+  for x in $( seq 1 $((degrees/90)) ); do
+    #debug "Rotated 90"
+    case "${result}" in
+      'N') result=W;;
+      'S') result=E;;
+      'E') result=N;;
+      'W') result=S;;
+    esac
+  done
+  echo "${result}"
+}
+
+function forward() {
+  local distance="${1}"
+  debug "Moving ${distance} in direction ${facing}"
+  case "${facing}" in 
+    'N') yPos=$(( yPos - distance ));;
+    'S') yPos=$(( yPos + distance ));;
+    'E') xPos=$(( xPos + distance ));;
+    'W') xPos=$(( xPos - distance ));;
+  esac
+}
+
+while read movement; do
+  direction=$( grep -Po '^.' <<<"${movement}" )
+  distance=$( grep -Po '\d+' <<<"${movement}" )
+  debug "Received instruction: ${direction} ${distance}"
+  case ${direction} in
+    'N') yPos=$(( yPos - distance ));;
+    'S') yPos=$(( yPos + distance ));;
+    'E') xPos=$(( xPos + distance ));;
+    'W') xPos=$(( xPos - distance ));;
+    'L') facing=$( getccw "${distance}" "${facing}" );;
+    'R') facing=$( getcw "${distance}" "${facing}" );;
+    'F') forward ${distance};;
+  esac
+done < "${inFile}"
+
+echo "Start position: 0, 0"
+echo "End position:   ${xPos}, ${yPos}"
+
+xPos=$( sed 's/-//' <<<"${xPos}" )
+yPos=$( sed 's/-//' <<<"${yPos}" )
+
+echo "Manhattan distance: $(( xPos + yPos ))"
+
+
+

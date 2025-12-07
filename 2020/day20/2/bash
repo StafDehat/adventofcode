@@ -1,0 +1,528 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function product() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "1";
+    for x in ${input}; do
+      echo -n " * ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function printArrangement() {
+  for y in $( seq 0 $((gridSize-1)) ); do
+    for x in $( seq 0 $((gridSize-1)) ); do
+      echo -ne "${arranged[${x},${y}]}\t"
+    done
+    echo
+  done
+}
+
+# Given a tile file, build its 'edges' file
+function getEdges() {
+  local tile="${1}"
+  local T L R B
+  T=$( head -n 1 "${tile}" )
+  L=$( grep -Po '^.' "${tile}" | xargs echo | tr -d ' ' )
+  R=$( grep -Po '.$' "${tile}" | xargs echo | tr -d ' ' )
+  B=$( tail -n 1 "${tile}" )
+  cat <<EOF
+$((2#${T}))
+$((2#${L}))
+$((2#${R}))
+$((2#${B}))
+$((2#$(rev<<<"${T}")))
+$((2#$(rev<<<"${L}")))
+$((2#$(rev<<<"${R}")))
+$((2#$(rev<<<"${B}")))
+EOF
+}
+
+# Given a tile ID, build its 'mates' file
+function getMates() {
+  local tileNum="${1}"
+  for edge in $( head -n 4 edges/${tileNum} ); do
+    basename "$( grep -l "^${edge}$" edges/* | grep -v "/${tileNum}$" )"
+  done
+}
+
+#function getTopEdge() {
+#  local tile="${1}"
+#  sed '1p' "./edges/${tile}"
+#}
+#function getLeftEdge() {
+#  local tile="${1}"
+#  sed '2p' "./edges/${tile}"
+#}
+#function getRightEdge() {
+#  local tile="${1}"
+#  sed '3p' "./edges/${tile}"
+#}
+#function getBottomEdge() {
+#  local tile="${1}"
+#  sed '4p' "./edges/${tile}"
+#}
+#function getTopEdgeR() { getTopEdge ${@} | rev; }
+#function getLeftEdgeR() { getLeftEdge ${@} | rev; }
+#function getRightEdgeR() { getRightEdge ${@} | rev; }
+#function getBottomEdgeR() { getBottomEdge ${@} | rev; }
+
+# Given a tile file, delete its border
+function trimEdges() {
+  local tile="${1}"
+  sed -i -e '1d' -e '$d' -e 's/^.\(.*\).$/\1/' "${tile}"
+}
+
+function rotateCW() {
+  local tileNum="${1}"
+  local degrees="${2}"
+  local tmp
+  case "${degrees}" in
+    90)
+      tmp=$( sed -e 's/\(.\)/ \1/g' "tiles/${tileNum}" | rs -T | rev | tr -d ' ' )
+    ;;
+    180)
+      tmp=$( tac "tiles/${tileNum}" | rev )
+    ;;
+    270)
+      tmp=$( sed -e 's/\(.\)/ \1/g' "tiles/${tileNum}" | rs -T | tac | tr -d ' ' )
+    ;;
+  esac
+  echo "${tmp}" >"tiles/${tileNum}"
+  getEdges "tiles/${tileNum}" > "edges/${tileNum}"
+  getMates "${tileNum}" > "mates/${tileNum}"
+}
+function rotateCCW() {
+  local tileNum="${1}"
+  local degrees="${2}" 
+  rotateCW "${tileNum}" $(( (${degrees}+180)%360 ))
+}
+function flipHorizontal() {
+  local tileNum="${1}"
+  local tmp=$( rev "tiles/${tileNum}" )
+  echo "${tmp}" > "tiles/${tileNum}"
+  getEdges "tiles/${tileNum}" > "edges/${tileNum}"
+  getMates "${tileNum}" > "mates/${tileNum}"
+}
+function flipVertical() {
+  local tileNum="${1}"
+  local tmp=$( tac "tiles/${tileNum}" )
+  echo "${tmp}" > "tiles/${tileNum}"
+  getEdges "tiles/${tileNum}" > "edges/${tileNum}"
+  getMates "${tileNum}" > "mates/${tileNum}"
+}
+
+function pickTileRightOf() {
+  local leftTileNum="${1}"
+  local rightTileNum=$( sed -n '3p' "mates/${leftTileNum}" )
+  # Orient so rightTile
+  local leftsRightEdge=$( sed -n '3p' "edges/${leftTileNum}" )
+  local rightsMatchingEdge=$( grep -n "^${leftsRightEdge}$" "edges/${rightTileNum}" | cut -d: -f1 )
+  case "${rightsMatchingEdge}" in
+    1) # Pointing UP, read L-to-R
+      debug "Rotating CCW-90 and V-Flip tile ${rightTileNum}"
+      rotateCCW ${rightTileNum} 90
+      flipVertical ${rightTileNum}
+    ;;
+    2) # Already correct - pointing LEFT, read Top-Down
+      debug "Tile ${rightTileNum} already oriented correctly"
+    ;;
+    3) # Pointing RIGHT, read Top-Down
+      debug "H-Flip tile ${rightTileNum}"
+      flipHorizontal ${rightTileNum}
+    ;;
+    4) # Pointing DOWN, read L-to-R
+      debug "Rotating CW-90 tile ${rightTileNum}"
+      rotateCW ${rightTileNum} 90
+    ;;
+    5) # Pointing UP, read R-to-L
+      debug "Rotating CCW-90 tile ${rightTileNum}"
+      rotateCCW ${rightTileNum} 90
+    ;;
+    6) # Pointing LEFT, read Bottom-Up
+      debug "V-Flip tile ${rightTileNum}"
+      flipVertical ${rightTileNum}
+    ;;
+    7) # Pointing RIGHT, read Bottom-Up
+      debug "Rotating 180 tile ${rightTileNum}"
+      rotateCW ${rightTileNum} 180
+    ;;
+    8) # Pointing DOWN, read R-to-L
+      debug "Rotating CW-90 and V-Flip tile ${rightTileNum}"
+      rotateCW ${rightTileNum} 90
+      flipVertical ${rightTileNum}
+    ;;
+  esac
+  echo "${rightTileNum}"
+}
+
+function pickTileUnder() {
+  local topTileNum="${1}"
+  local bottomTileNum=$( sed -n '4p' "mates/${topTileNum}" )
+  # Orient bottomTile
+  local topsBottomEdge=$( sed -n '4p' "edges/${topTileNum}" )
+  local bottomsMatchingEdge=$( grep -n "^${topsBottomEdge}$" "edges/${bottomTileNum}" | cut -d: -f1 )
+  case "${bottomsMatchingEdge}" in
+    1) # Pointing UP, read L-to-R
+      debug "Tile ${bottomTileNum} already oriented correctly"
+    ;;
+    2) # Pointing LEFT, read Top-Down
+      debug "Rotating CW-90 and H-Flip tile ${bottomTileNum}"
+      rotateCW ${bottomTileNum} 90
+      flipHorizontal ${bottomTileNum}
+    ;;
+    3) # Pointing RIGHT, read Top-Down
+      debug "Rotating CCW-90 tile ${bottomTileNum}"
+      rotateCCW ${bottomTileNum} 90
+    ;;
+    4) # Pointing DOWN, read L-to-R
+      debug "V-Flip tile ${bottomTileNum}"
+      flipVertical ${bottomTileNum}
+    ;;
+    5) # Pointing UP, read R-to-L
+      debug "H-Flip tile ${bottomTileNum}"
+      flipHorizontal ${bottomTileNum}
+    ;;
+    6) # Pointing LEFT, read Bottom-Up
+      debug "Rotating CW-90 ${bottomTileNum}"
+      rotateCW ${bottomTileNum} 90
+    ;;
+    7) # Pointing RIGHT, read Bottom-Up
+      debug "Rotating CCW-90 and H-Flip tile ${bottomTileNum}"
+      rotateCCW ${bottomTileNum} 90
+      flipHorizontal ${bottomTileNum}
+    ;;
+    8) # Pointing DOWN, read R-to-L
+      debug "Rotating 180 degrees, tile ${bottomTileNum}"
+      rotateCW ${bottomTileNum} 180
+    ;;
+  esac
+  echo "${bottomTileNum}"
+}
+
+
+inFile="${1}"
+
+rm -rf tiles edges mates
+mkdir tiles edges mates
+
+awk '/^\s*$/{n++}
+  {print >"tiles/out"n".txt"}
+  END {print n}' < "${inFile}" >/dev/null
+
+numTiles=$( grep -c Tile "${inFile}" )
+gridSize=$(bc <<< "scale=0; sqrt((${numTiles}))")
+
+for x in tiles/out*.txt; do
+  # Ensure the file actually contains data, else rm it.
+  if ! grep -q "Tile" "${x}"; then
+    rm -f "${x}"
+    continue
+  fi
+
+  tile=$( grep Tile "${x}" | grep -Po '\d+' )
+  grep -Po '^\s*[#\.]+\s*$' "${x}" | 
+    tr '.#' '01' > "tiles/${tile}"
+  rm -f "${x}"
+done
+
+# Build a structured list of each tile's edge patterns
+# T, L, R, B, T', L', R', B'
+# We're treating '.' as 0, and '#' as 1, and we'll treat
+#   every edge as a binary number.
+for tile in tiles/*; do
+  getEdges "${tile}" > "./edges/$(basename ${tile})"
+done
+
+# To minimize exponential growth, pre-process every tile's neighbours
+for tile in tiles/*; do
+  tileNum=$( basename "${tile}" )
+  getMates "${tileNum}" > "./mates/${tileNum}"
+
+
+  tileNum=$( basename "${tile}" )
+  for edge in $( head -n 4 edges/${tileNum} ); do
+    mate=$( grep -l "^${edge}$" edges/* | grep -v "/${tileNum}$" )
+    basename "${mate}"
+  done > mates/"${tileNum}"
+done
+
+# Don't trim the edges yet - we'll use them to re-generate edge & mate files if/when we flip/rotate
+#trimEdges "${tile}"
+
+
+# I'm gonna grab one of the corner pieces,
+#   rotate it so it's the top-left, then
+#   build down & right for every next piece.
+
+# Find one that only has 2 mates (ie: A corner)
+TL=$( 
+  for tile in mates/*; do
+    numMates=$( grep -cP '^\d+$' "${tile}" )
+    if [[ ${numMates} -eq 2 ]]; then
+      basename "${tile}"
+      break
+    fi
+  done
+)
+
+T=$( sed -n '1p' mates/${TL} )
+L=$( sed -n '2p' mates/${TL} )
+if [[ -z "${T}${L}" ]]; then
+  # Top and Left mates are both null, so this tile must already be oriented for the top-left corner:
+  debug "Tile ${TL} already oriented for top-left corner"
+elif [[ "${T}${L}" == "${T}" ]]; then
+  # "Left" is null, but "Top" is not - rotate CW 90-degrees
+  debug "Tile ${TL} oriented for bottom-left corner - rotating 90-degrees clockwise"
+  rotateCW "${TL}" 90
+elif [[ "${T}${L}" == "${L}" ]]; then
+  # T is null but L is not - rotate CCW 90-degrees
+  debug "Tile ${TL} oriented for top-right corner - rotating 90-degrees counter-clockwise"
+  rotateCCW "${TL}" 90
+else
+  # Both T & L must be non-null.  Rotate 180.
+  debug "Tile ${TL} oriented for bottom-right corner - rotating 180 degrees"
+  rotateCW "${TL}" 180
+fi
+
+# We now have a corner piece selected, and oriented so it fits the top-left corner.
+declare -A arranged
+xPos=0
+yPos=0
+arranged[${xPos},${yPos}]=${TL}
+
+# We manually inserted 0,0 - advance xPos for the loop
+xPos=$((xPos+1))
+# Populate the top row of the grid
+while [[ ${xPos} -lt ${gridSize} ]]; do
+  leftTileNum=${arranged[$((xPos-1)),${yPos}]}
+  rightTileNum=$( pickTileRightOf ${leftTileNum} )
+  arranged[${xPos},${yPos}]=${rightTileNum}
+  xPos=$((xPos+1))
+done
+
+# First row's done - go down one, and find bottom mates
+yPos=$((yPos+1))
+while [[ ${yPos} -lt ${gridSize} ]]; do
+  xPos=0
+  while [[ ${xPos} -lt ${gridSize} ]]; do
+    topTileNum=${arranged[${xPos},$((yPos-1))]}
+    bottomTileNum=$( pickTileUnder ${topTileNum} )
+    arranged[${xPos},${yPos}]=${bottomTileNum}
+    xPos=$((xPos+1))
+  done
+  yPos=$((yPos+1))
+done
+
+echo "All tiles fit together like so:"
+printArrangement
+
+
+debug "Trimming the border off the tiles"
+for tile in tiles/*; do
+  trimEdges ${tile}
+done
+
+debug "Writing map to file"
+strMap=$( 
+  while read LINE; do
+    (
+      cd tiles
+      paste ${LINE}
+    )
+  done < <(printArrangement) | sed 's/\s*//g'
+)
+echo "${strMap}" | sed 's/\s*//g' > rawMap
+
+# By saving the map as a "tile", I can use rotateCW & such:
+mapFile="all"
+cp rawMap tiles/${mapFile}
+
+
+
+#####################
+# Major Logic Split #
+#####################
+# Above this point, we were puzzling together the map.
+# Below this point, we're orienting the finished map and counting Sea Monsters.
+
+
+
+function importMapFromFile() {
+  local mapFile="${1}"
+  local x y
+  y=0
+  while read LINE; do
+    x=0
+    while read -n 1 char; do
+      mapGrid[${x},${y}]=${char}
+      x=$((x+1))
+    done <<<"${LINE}"
+    y=$((y+1))
+  done < "${mapFile}"
+}
+
+function printMap() {
+  debug "Printing map"
+  for y in $( seq 0 $((mapSize-1)) ); do
+    for x in $( seq 0 $((mapSize-1)) ); do
+      echo -n "${mapGrid[${x},${y}]}"
+    done
+    echo
+  done
+}
+
+function isMonsterNose() {
+  local xPos="${1}"
+  local yPos="${2}"
+  # This is a Sea Monster:
+  #                   1 |0
+  # 1    11    11    111|1
+  #  1  1  1  1  1  1   |2
+  #---------------------+
+  # 01234567890123456789
+  # A monster always has a '1' at the following offsets from its nose coordinates:
+  # 1:    0, 0  # Nose
+  # 2:   -1,-1  # Head
+  # 3:   -1, 0  # Head
+  # 4:   -2, 0  # Head
+  # 5:   -3,+1  # Head
+  # 6:   -6,+1  # Upper back
+  # 7:   -7, 0  # Upper back
+  # 8:   -8, 0  # Upper back
+  # 9:   -9,+1  # Upper back
+  # 10: -12,+1  # Lower back
+  # 11: -13, 0  # Lower back
+  # 12: -14, 0  # Lower back
+  # 13: -15,+1  # Lower back
+  # 14: -18,+1  # Tail
+  # 15: -19, 0  # Tail
+  local -a xOffset=( 0 -1 -1 -2 -3 -6 -7 -8 -9 -12 -13 -14 -15 -18 -19 )
+  local -a yOffset=( 0 -1  0  0  1  1  0  0  1   1   0   0   1   1   0 )
+  for index in $( seq 0 $((${#xOffset[@]}-1)) ); do
+    if [[ ${mapGrid[$(( ${xPos} + ${xOffset[${index}]} )),$(( ${yPos} + ${yOffset[${index}]} ))]} -ne 1 ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+function countMonsters() {
+  # This is a Sea Monster:
+  #                   1 |0
+  # 1    11    11    111|1
+  #  1  1  1  1  1  1   |2
+  #---------------------+
+  # 01234567890123456789
+  # Monsters are always 20x3, upright, facing right
+  # As such, the monster's nose could be:
+  #   As far  left as x=19
+  #   As far right as x=mapSize-1
+  #   As  low as y=1
+  #   As high as y=mapSize-2
+  local numMonsters=0
+  for yPos in $( seq 1 $((mapSize-2)) ); do
+    for xPos in $( seq 19 $((mapSize-1)) ); do
+      if isMonsterNose ${xPos} ${yPos}; then
+        numMonsters=$((numMonsters+1))
+      fi
+    done
+  done
+  echo "${numMonsters}"
+}
+
+declare -A mapGrid
+declare mapSize=$( cat tiles/${mapFile} | wc -l )
+
+numOnes=$( grep -Po 1 tiles/${mapFile} | wc -l )
+echo "${numOnes} total hashes in the map"
+echo "15 hashes per sea monster"
+
+permutation=1
+
+# Try as-is
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+# Turn CW-90
+rotateCW ${mapFile} 90
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+# Turn CW-90 (180 total, now)
+rotateCW ${mapFile} 90
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+# Turn CW-90 (270 total, now)
+rotateCW ${mapFile} 90
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+# Flip it over
+flipHorizontal ${mapFile}
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+# Turn CW-90
+rotateCW ${mapFile} 90
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+# Turn CW-90 (180 total, now)
+rotateCW ${mapFile} 90
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+# Turn CW-90 (270 total, now)
+rotateCW ${mapFile} 90
+importMapFromFile tiles/${mapFile}
+numMonsters=$( countMonsters )
+echo "${numMonsters} found in permutation ${permutation}"
+permutation=$((permutation+1))
+
+
+echo "Now you do the math."
+

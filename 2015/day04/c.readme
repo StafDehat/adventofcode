@@ -1,0 +1,3 @@
+Gotta link to included libraries this time:
+# gcc -O3 c.c -lcrypto -lssl
+# time ./a.out

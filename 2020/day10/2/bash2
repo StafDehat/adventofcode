@@ -1,0 +1,20 @@
+#!/bin/bash
+
+inFile="${1}"
+
+function debug() {
+  echo "${@}" >&2
+}
+
+function pathsFrom0To() {
+  local goal="${1}"
+  
+}
+
+steps=( 0 $( cat "${inFile}" | sort -n ) )
+goal=$( cat "${inFile}" | sort -n | tail -n 1 )
+goal=$(( goal + 3 ))
+steps[${#steps[@]}]=${goal}
+
+countPaths ${steps[@]}
+

@@ -1,0 +1,57 @@
+#!/bin/bash
+
+inFile="${1}"
+
+function debug() {
+  echo "${@}" >&2
+}
+
+#
+# This works, but it's real inefficient
+# So inefficient, in fact, that it may never finish
+function countPaths() {
+  local steps=( ${@} )
+  #debug "Sub-list: ${steps[@]}"
+  #local start=${steps[0]}
+  local numSteps=${#steps[@]}
+  #local goal=${steps[${#steps[@]} - 1]}
+
+  if [[ "${#steps[@]}" -le 1 ]]; then
+    echo "ERROR - 1 item list - shouldn't happen" >&2
+    return 0
+  fi
+
+  # Only one path left.  Take it.
+  if [[ "${#steps[@]}" -le 2 ]]; then
+    echo 1
+    return 1
+  fi
+
+  local total=0
+  local subPaths=0
+
+  # Next paths
+
+  #Take at least 1 step
+  local x=1
+  local stepSize=0
+  while true; do
+    stepSize=$(( ${steps[${x}]} - ${steps[0]} ))
+    #debug "Math: ${steps[${x}]} - ${steps[0]}"
+    #debug "Step Size: ${stepSize}"
+    [[ ${stepSize} -le 3 ]] || break
+    subPaths=$( countPaths ${steps[@]:${x}:${numSteps}} )
+    #debug "sub paths: ${subPaths}"
+    total=$(( total + subPaths ))
+    x=$((x+1))
+  done
+  echo "${total}"
+}
+
+steps=( 0 $( cat "${inFile}" | sort -n ) )
+goal=$( cat "${inFile}" | sort -n | tail -n 1 )
+goal=$(( goal + 3 ))
+steps[${#steps[@]}]=${goal}
+
+countPaths ${steps[@]}
+

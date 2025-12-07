@@ -1,0 +1,52 @@
+#!/bin/bash
+
+inFile="${1}"
+
+declare -a program
+while read LINE; do
+  program[${#program[@]}]="${LINE}"
+done < "${inFile}"
+# Line #s are array position now
+
+# Basic debug stuff:
+output=$( ../1/code "${inFile}" )
+resp=$?
+echo "Original program output: ${output}"
+echo "Original program exit:   ${resp}"
+
+# Build a filesystem representation
+progFS=$( mktemp -d )
+cd "${progFS}"
+for x in $(seq 0 $((${#program[@]}-1)) ); do
+  read instruction arg <<<"${program[${x}]}"
+
+  # Every directory will be a line #
+  mkdir "${x}"
+
+  case "${instruction}" in
+    nop)
+      echo "${x}" >> nopList
+      (
+        cd "${x}"
+        ln -s ../$((x+1)) next
+        echo 0 > accMod
+      );;
+    acc) 
+      echo "${x}" >> accList
+      (
+        cd "${x}"
+        ln -s ../$((x+1)) next
+        echo "${arg}" > accMod
+      );;
+    jmp)
+      echo "${x}" >> jmpList
+      (
+        cd "${x}"
+        ln -s ../$((x+arg)) next
+        echo 0 > accMod
+      );;
+  esac
+done
+
+echo "${progFS}"
+

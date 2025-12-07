@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def age(school):
+  for f in range(0,len(school)):
+    if school[f] == 0:
+      school[f] = 7
+      school.append(8)
+    school[f] -= 1
+  #end for
+  return school
+#end age()
+
+school = [int(age) for age in lines[0].split(',')]
+print("Initial state:",str(school))
+days = 80
+for day in range(0,days):
+  school = age(school)
+#  print("After",
+#        "".join(str(day+1)).rjust(2),
+#        str(school))
+
+print("After %s days: " % days,
+      str(len(school)))
+
+
+

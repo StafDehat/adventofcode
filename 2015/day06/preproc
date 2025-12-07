@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Ensure all coords are referenced from the top-left to bottom-right corners.
+grep -Po '[\d,]+ through [\d,]+' instructions | sed 's/through //' > tmp
+while read from to; do
+  fromX=$( cut -d, -f1 <<<"${from}" )
+  fromY=$( cut -d, -f2 <<<"${from}" )
+  toX=$( cut -d, -f1 <<<"${to}" )
+  toY=$( cut -d, -f2 <<<"${to}" )
+  if [[ ${fromX} -gt ${toX} ]] ||
+     [[ ${fromY} -gt ${toY} ]]; then
+    echo Problem
+  fi
+done < tmp

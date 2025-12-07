@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Split input file into one file per passport
+rm -f parts/out*.txt
+cat "${1}" | 
+  awk '/^\s*$/{n++}
+    {print >"parts/out"n".txt"}
+    END {print n}'
+
+# Check each passport
+count=0
+for x in parts/*; do
+  data=$( grep -Po 'byr:\d{4}' "$x" | cut -d: -f2 )
+  [[ -z "${data}" ]] && continue
+  [[ "${data}" -lt 1920 ]] && continue
+  [[ "${data}" -gt 2002 ]] && continue
+
+  data=$( grep -Po 'iyr:\d{4}' "$x" | cut -d: -f2 )
+  [[ -z "${data}" ]] && continue
+  [[ "${data}" -lt 2010 ]] && continue
+  [[ "${data}" -gt 2020 ]] && continue
+
+  data=$( grep -Po 'eyr:\d{4}' "$x" | cut -d: -f2 )
+  [[ -z "${data}" ]] && continue
+  [[ "${data}" -lt 2020 ]] && continue
+  [[ "${data}" -gt 2030 ]] && continue
+
+  data=$( grep -Po 'hgt:\d+(cm|in)(\s|$)' "$x" | cut -d: -f2 )
+  [[ -z "${data}" ]] && continue
+  if grep -q "cm" <<<"${data}"; then
+    data=$( grep -Po '\d+' <<<"${data}" )
+    [[ "${data}" -lt 150 ]] && continue
+    [[ "${data}" -gt 193 ]] && continue
+  else
+    data=$( grep -Po '\d+' <<<"${data}" )
+    [[ "${data}" -lt 59 ]] && continue
+    [[ "${data}" -gt 76 ]] && continue
+  fi
+
+  data=$( grep -Po 'hcl:#[0-9a-f]{6}(\s|$)' "$x" | cut -d: -f2 )
+  [[ -z "${data}" ]] && continue
+
+  data=$( grep -Po 'ecl:(amb|blu|brn|gry|grn|hzl|oth)(\s|$)' "$x" | cut -d: -f2 )
+  [[ -z "${data}" ]] && continue
+
+  data=$( grep -Po 'pid:\d{9}(\s|$)' "$x" | cut -d: -f2 )
+  [[ -z "${data}" ]] && continue
+
+  count=$(( count + 1 ))
+done
+
+echo ${count}

@@ -1,0 +1,144 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function war() {
+  # The decks:
+  local p1="${1}"
+  local p2="${2}"
+  local gameId="${3}"
+  local p1Sub
+  local p2Sub
+  local p1Card
+  local p2Card
+  #local rounds="$(mktemp -d)"
+  local oldRounds="$(mktemp)"
+  local roundHash=""
+  local round=0
+  local winner=0
+  local numCards=$( cat "${p1}" "${p2}" | wc -l )
+
+  #debug "Begin game: ${p1} vs ${p2}"
+  while true; do
+    round=$((round+1))
+    debug "G${gameId}:R${round}"
+    debug "G${gameId}:R${round} $(cat "${p1}" "${p2}" | wc -l) cards in play"
+    debug "G${gameId}:R${round} P1 deck: " $(cat "${p1}")
+    debug "G${gameId}:R${round} P2 deck: " $(cat "${p2}")
+    if [[ $(cat "${p1}" "${p2}" | wc -l) -ne ${numCards} ]]; then
+      debug "G${gameId}:R${round} ERROR: Number of cards in play changed, somewhere"
+      exit
+    fi
+
+    # RULE #1:
+    # Before either player deals a card, if there was a
+    #   previous round in this game that had exactly the
+    #   same cards in the same order in the same players'
+    #   decks, the game instantly ends in a win for player
+    #   1. Previous rounds from other games are not
+    #   considered. (This prevents infinite games of
+    #   Recursive Combat, which everyone agrees is a bad idea.)
+    roundHash=$( paste "${p1}" "${p2}" | md5sum | cut -d\  -f1 )
+    if grep -q "^${roundHash}" "${oldRounds}"; then
+      debug "G${gameId}:R${round} Repeat round.  Player 1 wins game."
+      winner=1
+      break
+    else
+      # Record this round's state, for future checking
+      echo "${roundHash}" >> "${oldRounds}"
+    fi
+
+    # RULE #2:
+    # Otherwise, this round's cards must be in a new
+    #   configuration; the players begin the round by each
+    #   drawing the top card of their deck as normal.
+    p1Card=$( head -n 1 "${p1}" )
+    p2Card=$( head -n 1 "${p2}" )
+    sed -i '1d' "${p1}" "${p2}"
+
+    debug "G${gameId}:R${round} Cards: ${p1Card} vs ${p2Card}"
+ 
+    # RULE #3:
+    # If both players have at least as many cards remaining
+    #   in their deck as the value of the card they just 
+    #   drew, the winner of the round is determined by playing
+    #   a new game of Recursive Combat.
+    if [[ $(cat "${p1}" | wc -l) -ge ${p1Card} ]] &&
+       [[ $(cat "${p2}" | wc -l) -ge ${p2Card} ]]; then
+      debug "G${gameId}:R${round} Sub-game necessary"
+      p1Sub=$(mktemp)
+      p2Sub=$(mktemp)
+      head -n ${p1Card} "${p1}" > "${p1Sub}"
+      head -n ${p2Card} "${p2}" > "${p2Sub}"
+      war "${p1Sub}" "${p2Sub}" $((gameId+1))
+      winner=${?}
+      rm -f "${p1Sub}" "${p2Sub}"
+      debug "G${gameId}:R${round} Sub-game complete: Player ${winner} won"
+    else
+      # RULE #4:
+      # Otherwise, at least one player must not have enough
+      #   cards left in their deck to recurse; the winner of
+      #   the round is the player with the higher-value card.
+      if [[ ${p1Card} -gt ${p2Card} ]]; then
+        winner=1
+      else
+        winner=2 #ie:2
+      fi
+      debug "G${gameId}:R${round} Round winner: Player ${winner}"
+    fi
+
+    # Give the cards to the winner
+    if [[ ${winner} -eq 1 ]]; then
+      debug "G${gameId}:R${round} Cards added to bottom of Player 1's deck: ${p1Card} ${p2Card}"
+      debug "G${gameId}:R${round} P1 Deck before: " $(cat "${p1}")
+      echo -e "${p1Card}\n${p2Card}" >> "${p1}"
+      debug "G${gameId}:R${round} P1 Deck after:  " $(cat "${p1}")
+    else
+      debug "G${gameId}:R${round} Cards added to bottom of Player 2's deck: ${p2Card} ${p1Card}"
+      debug "G${gameId}:R${round} P2 Deck before: " $(cat "${p2}")
+      echo -e "${p2Card}\n${p1Card}" >> "${p2}"
+      debug "G${gameId}:R${round} P2 Deck after:  " $(cat "${p2}")
+    fi
+
+    # If either player is now out, game-over:
+    if [[ $(cat "${p1}" | wc -l) -le 0 ]]; then
+      debug "G${gameId}:R${round} Player 1 out of cards - P2 wins game"
+      winner=2
+      break
+    fi
+    if [[ $(cat "${p2}" | wc -l) -le 0 ]]; then
+      debug "G${gameId}:R${round} Player 2 out of cards - P1 wins game"
+      winner=1
+      break
+    fi
+  done
+
+  # This game is over - no round-tracking required any longer:
+  rm -f "${oldRounds}"
+
+  index=1
+  score=0
+  for card in $( tac "${p1}" "${p2}" ); do
+    score=$(( score + card*index ))
+    index=$((index+1))
+  done
+
+  echo "Game ${gameId} winning score: ${score}"
+  return "${winner}"
+}
+
+inFile="${1}"
+
+numLines=$( cat "${inFile}" | wc -l )
+p1Deck=$( mktemp )
+p2Deck=$( mktemp )
+head -n $(( numLines/2 )) "${inFile}" | grep -Po '^\d+' > "${p1Deck}"
+tail -n $(( numLines/2 )) "${inFile}" | grep -Po '^\d+' > "${p2Deck}"
+
+
+debug "Primary game"
+war "${p1Deck}" "${p2Deck}" 0
+

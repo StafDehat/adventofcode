@@ -1,0 +1,62 @@
+#!/bin/bash
+
+inFile="${1}"
+
+declare -a program
+while read LINE; do
+  program[${#program[@]}]="${LINE}"
+done < "${inFile}"
+# Line #s are array position now
+
+
+echo "${#program[@]} lines in original program."
+#for line in "${program[@]}"; do
+#  echo "${line}"
+#done
+
+output=$( ../1/code "${inFile}" )
+resp=$?
+echo "Original program output: ${output}"
+echo "Original program exit:   ${resp}"
+
+
+echo "Commencing tweaks"
+for x in $( seq 0 ${#program[@]} ); do
+  if grep -q 'nop' <<<"${program[${x}]}"; then
+    program[${x}]=$( sed 's/nop/jmp/' <<<"${program[${x}]}" )
+  elif grep -q 'jmp' <<<"${program[${x}]}"; then
+    program[${x}]=$( sed 's/jmp/nop/' <<<"${program[${x}]}" )
+  else
+    continue
+  fi
+
+  echo "Tweaking line #${x}"
+
+  testFile=$( mktemp )
+  # Print the program:
+  for line in "${program[@]}"; do
+    echo "${line}"
+  done > "${testFile}"
+
+  output=$( ../1/code "${testFile}" )
+  resp="${?}"
+  echo "${output}"
+
+  if [[ "${resp}" -eq 0 ]]; then
+    echo "Success"
+    break
+  fi
+
+  echo
+
+  # Undo the last tweak, to prep for the next tweak
+  if grep -q 'nop' <<<"${program[${x}]}"; then
+    program[${x}]=$( sed 's/nop/jmp/' <<<"${program[${x}]}" )
+  elif grep -q 'jmp' <<<"${program[${x}]}"; then
+    program[${x}]=$( sed 's/jmp/nop/' <<<"${program[${x}]}" )
+  else
+    continue
+  fi
+done
+
+

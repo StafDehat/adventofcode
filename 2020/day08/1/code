@@ -1,0 +1,64 @@
+#!/bin/bash
+
+inFile="${1}"
+
+declare -a program
+while read LINE; do
+  program[${#program[@]}]="${LINE}"
+done < "${inFile}"
+# Line #s are array position now
+
+# Print the program:
+#for line in "${program[@]}"; do
+#  echo "${line}"
+#done
+
+# Track # of executions of each line
+declare -a execCnt
+for x in $( seq 0 ${#program[@]} ); do
+  execCnt[${x}]=0 # Initialize all to 0
+done
+
+acc=0
+execPtr=0
+response=0
+
+while true; do
+  # Bail if we've already executed this instruction:
+  if [[ "${execCnt[${execPtr}]}" -gt 0 ]]; then
+    response=1
+    break
+  fi
+  # Exit gracefully if execPtr is > the last line in program:
+  if [[ "${execPtr}" -ge "${#program[@]}" ]]; then
+    response=0
+    break
+  fi
+
+  # Otherwise, record that we're executing it:
+  execCnt[${execPtr}]=$(( ${execCnt[${execPtr}]} + 1 ))
+
+  # And then actually execute it:
+  codeLine=${program[${execPtr}]}
+  read instruction arg <<<"${codeLine}"
+  case "${instruction}" in
+    nop)
+      execPtr=$(( execPtr + 1 ))
+    ;;
+    acc)
+      acc=$(( acc + arg ))
+      execPtr=$(( execPtr + 1 ))
+    ;;
+    jmp)
+      execPtr=$(( execPtr + arg ))
+    ;;
+  esac
+done
+
+echo "Exit status: ${response}"
+echo "Accumulator: ${acc}"
+echo "execPtr:     ${execPtr}"
+echo "program#:    ${#program[@]}"
+
+exit "${response}"
+

@@ -1,0 +1,98 @@
+#!/bin/bash
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function product() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "1";
+    for x in ${input}; do
+      echo -n " * ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function getEdges() {
+  tile="${1}"
+
+  head -n 1 "${tile}"
+  tail -n 1 "${tile}"
+  grep -Po '^.' "${tile}" | xargs echo | tr -d ' '
+  grep -Po '.$' "${tile}" | xargs echo | tr -d ' '
+  
+  head -n 1 "${tile}" | rev
+  tail -n 1 "${tile}" | rev
+  grep -Po '^.' "${tile}" | xargs echo | tr -d ' ' | rev
+  grep -Po '.$' "${tile}" | xargs echo | tr -d ' ' | rev
+}
+
+
+inFile="${1}"
+
+rm -rf tiles edges
+mkdir tiles edges
+
+awk '/^\s*$/{n++}
+  {print >"tiles/out"n".txt"}
+  END {print n}' < "${inFile}" >/dev/null
+
+cd tiles
+for x in out*.txt; do
+  # Ensure the file actually contains data, else rm it.
+  if ! grep -q "Tile" "${x}"; then
+    rm -f "${x}"
+    continue
+  fi
+
+  tile=$( grep Tile "${x}" | grep -Po '\d+' )
+  grep -Po '^\s*[#\.]+\s*$' "${x}" > "${tile}"
+  rm -f "${x}"
+done
+
+for tile in *; do
+  getEdges "${tile}" > "../edges/${tile}"
+done
+
+cd ../edges
+for tile in *; do
+  fits=$(
+    for edge in $( head -n 4 ${tile} ); do
+      grep -l ${edge//\./\\.} * |
+        grep -v "${tile}" | wc -l
+    done | sum
+  )
+  # Must be a corner piece - only 2 edges fit against others
+  if [[ "${fits}" -eq 2 ]]; then
+    echo "${tile}"
+    continue
+  fi
+  # Must be an edge piece - only 3 edges fit against others
+  if [[ "${fits}" -eq 3 ]]; then
+    #echo "${tile}"
+    continue
+  fi
+  # Must be interior - all 4 edges fit against others
+  #echo "${tile}"
+done | product
+
+

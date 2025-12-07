@@ -1,0 +1,90 @@
+#!/bin/bash
+
+if [[ ${#} -ne 1 ]]; then
+  echo "Missing argument: Input file" >&2
+  exit 1
+fi
+
+INFILE="${1}"
+if ! [[ -r "${INFILE}" ]]; then
+  echo "Unable to read input file: ${INFILE}" >&2
+  exit 1
+fi
+
+# Define some math libraries:
+. ../../math.bash
+
+
+# Make a "2d array" (actually a hash)
+declare -A engine
+row=0
+while read LINE; do
+  col=0
+  while read -n 1 char; do
+    engine[${row},${col}]="${char}"
+    col=$((col+1))
+  done <<<"${LINE}"
+  row=$((row+1))
+done < "${INFILE}"
+
+numRows=$( wc -l < "${INFILE}" )
+numCols=$( head -n 1 "${INFILE}" | tr -d '\n' | wc -c )
+
+
+function display() {
+  for x in $(seq 0 ${numCols}); do
+    for y in $(seq 0 ${numRows}); do
+      echo -n "${engine[${x},${y}]} "
+    done
+    echo
+  done
+}
+#display
+
+function isSymbol() {
+  grep -vq "${1/\\/\\\\}" <<<".0123456789"
+}
+function isDigit() {
+  grep -qP '^\d$' <<<"${1}"
+}
+
+# ${engine[x,y]}:
+#    x1 x2
+# y1 .  .
+# y2 .  .
+
+declare -a symbolCoords
+for x in $(seq 0 ${numCols}); do
+  for y in $(seq 0 ${numRows}); do
+    if isSymbol "${engine[$x,$y]}"; then
+      symbolCoords[${#symbolCoords[@]}]="$x $y"
+    fi
+  done
+done
+
+echo "Symbols at:"
+for coords in "${symbolCoords[@]}"; do
+  echo "${coords}"
+done
+
+# For each symbol
+for coord in "${symbolCoords[@]}"; do
+  read x y <<<"${coord}"
+  # Check all 8 cardinal directions for a number.
+  for ny in $( seq $((y-1)) $((y+1)) ); do
+    for nx in $(seq $((x-1)) $((x+1)) ); do
+      # Skip the symbol itself
+      [[ ${nx} -eq ${x} ]] && [[ ${ny} -eq ${y} ]] && continue
+      # If number found...
+      if isDigit ${engine[${nx},${ny}]}; then
+        # Walk x-- until you find the start of the number
+        # Record coord of number's start
+      fi
+    done
+  done
+done
+
+
+
+
+

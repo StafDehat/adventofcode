@@ -1,0 +1,12 @@
+The example in Part 2 is incorrect.
+
+It should read:
+The largest magnitude of the sum of any two snailfish numbers in this list is 3891. This is the magnitude of [[2,[[7,7],7]],[[5,8],[[9,3],[0,2]]]] + [[[[5,2],5],[8,[3,7]]],[[5,[7,5]],[4,4]]], which reduces to [[[[7,8],[6,6]],[[6,6],[6,7]]],[[[6,0],[7,7]],[[7,7],[7,6]]]].
+
+Text claims the sum reduces to:
+[[[[7,8],[6,6]],[[6,0],[7,7]]],[[[7,8],[8,8]],[[7,9],[0,6]]]]
+The magnitude of this number is in fact 3993, however that is not the correct reduced-sum.
+
+In fact, it reduces to:
+[[[[7,0],[7,8]],[[7,9],[0,6]]],[[[7,8],[6,0]],[[6,6],[7,8]]]]
+Which has a magnitude of 3617.

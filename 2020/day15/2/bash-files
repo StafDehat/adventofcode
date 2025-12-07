@@ -1,0 +1,66 @@
+#!/bin/bash
+
+inFile="${1}"
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+# Hashes in BASH seem to grow exponentially slower as they grow in size.
+#   That SUCKS - it means this O(n) code actually runs in O(n^2).
+#   Best guess on why: When I add to the hash, I think it makes
+#   a memory-copy of the hash.
+# Anyway, as a solution, I'm attempting to use the /tmp filesystem as
+#   a makeshift "hash".  We're using QMail-style modulus to divvy up
+#   the files into sub-directories, to avoid having 1million files in
+#   a single directory.
+# Yes, filesystem is a slow choice of data-structure here, but...
+#   O(100*n) is still faster than O(1*n^2), when n=30-million.
+tmpdir=$( mktemp -d )
+numdirs=1000
+for x in $( seq 0 ${numdirs} ); do
+  mkdir "${tmpdir}/${x}"
+done
+echo "${tmpdir}"
+
+index=1
+input=( $( grep -Po '\d+' "${inFile}" ) )
+for num in ${input[@]}; do
+  echo ${index} > ${tmpdir}/$((num%numdirs))/${num}
+  index=$(( index+1 ))
+done
+last=${num}
+
+# The next number will be zero, because the explicit input had no duplicates:
+next=0
+
+stopAt=30000000
+#stopAt=2020
+#stopAt=100000
+#stopAt=10
+
+while true; do
+  # When index=2020, we've already inserted that many entries
+  (( ${index} >= ${stopAt} )) && break
+
+  last=${next}
+  if [[ -f "${tmpdir}/$((last%numdirs))/${last}" ]]; then
+    next=$(( index - $(cat ${tmpdir}/$((last%numdirs))/${last}) ))
+  else
+    next=0
+  fi
+
+  #debug "Speaking number ${index}: ${last}"
+
+  echo ${index} > ${tmpdir}/$((last%numdirs))/${last}
+  index=$(( index + 1 ))
+
+  # Debug messages, but not so many that we slow it down:
+  (( ${index} % 100000 == 0 )) && \
+    debug "The ${index}th number spoken was ${next}"
+done
+
+echo "The ${index}th number spoken was ${next}"
+
+

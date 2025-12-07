@@ -1,0 +1,115 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function printCupsFromTo() {
+  local startCup="${1}"
+  local stopCup="${2}"
+  [[ ${startCup} -eq ${stopCup} ]] && return
+  echo "${startCup}"
+  printCupsFromTo ${next[${startCup}]} ${stopCup}
+}
+function printCupsFrom() {
+  local startCup="${1}"
+  echo "${startCup}"
+  printCupsFromTo ${next[${startCup}]} ${startCup}
+}
+function printTwoCupsFrom() {
+  local startCup="${1}"
+  local first=${next[${startCup}]}
+  local second=${next[${first}]}
+  echo "Following cup ${startCup}: ${first} ${second}"
+}
+
+debug "Beginning execution"
+
+inFile="${1}"
+#numCups=$( grep -Po '\d' ${inFile} | wc -l )
+#       .---...
+numCups=1000000
+numMoves=10000000
+#        ..---...
+#numCups=200
+#numMoves=100000
+
+unset next cupInput
+declare -A next
+
+declare -a cupInput
+cupInput=( $( grep -Po '\d' "${inFile}" ) )
+
+
+# Build the linked-list associations
+index=0
+while [[ ${index} -lt ${#cupInput[@]} ]]; do
+  cup=${cupInput[${index}]}
+  next[${cup}]=${cupInput[$(( (${index}+1)%${#cupInput[@]} ))]}
+  index=$((index+1))
+done
+debug "Input read - cup list built"
+#debug "Num Cups: ${numCups}"
+if [[ ${numCups} -gt ${#cupInput[@]} ]]; then
+  debug "Adding $((numCups-${#cupInput[@]})) additional cups"
+  cup=${index}
+  while [[ ${cup} -lt ${numCups} ]]; do
+    cup=$((cup+1))
+    next[${cup}]=$((cup+1))
+  done
+  # Fix the edge cases:
+  #   The 9th cup (at pos8) & Cup10 point at each other:
+  next[${cupInput[8]}]=10
+  #   The first cup (at pos0) & last cup (numCups) point at each other:
+  next[${numCups}]=${cupInput[0]}
+fi
+
+debug "Cup ring complete."
+debug "Begining move loop."
+
+moveCount=0
+current=${cupInput[0]}
+while (( ${moveCount} < ${numMoves} )); do
+  # Current already set
+  pickup1=${next[${current}]}
+  pickup2=${next[${pickup1}]}
+  pickup3=${next[${pickup2}]}
+  postPickup=${next[${pickup3}]}
+
+  # Pick the most-likely dest, then check for errors:
+  dest=$((current-1))
+  while true; do
+    (( ${dest} <= 0 )) && dest=${numCups}
+    # As long as our ideal cup isn't picked up, we're good:
+    if (( ${dest} != ${pickup1} &&
+          ${dest} != ${pickup2} &&
+          ${dest} != ${pickup3} )); then
+      break
+    fi
+    dest=$((dest-1))
+  done
+  # Note which cup follows 'dest', too
+  postDest=${next[${dest}]}
+
+  # Remove picked-up cups from the sequence
+  next[${current}]=${postPickup}
+
+  # Insert picked-up cups between dest & postDest
+  next[${dest}]=${pickup1}
+  next[${pickup3}]=${postDest}
+
+  # Update the 'current' cup
+  current=${next[${current}]}
+
+  moveCount=$((moveCount+1))
+  # Report every 1,000 moves:
+  (( $(( moveCount%1000 )) == 0 )) && debug "${moveCount} moves completed"
+done
+
+echo "After ${moveCount} moves: "
+#printCupsFrom 1 | xargs echo
+printTwoCupsFrom 1
+
+
+

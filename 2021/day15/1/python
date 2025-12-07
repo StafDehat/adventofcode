@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def display(grid):
+  for row in grid:
+    print(row)
+#end display()
+
+def cascade(x,y):
+  global grid
+  global weights
+
+  if x > 0:
+    if weights[x][y]+grid[x-1][y] < weights[x-1][y]:
+      weights[x-1][y] = weights[x][y]+grid[x-1][y]
+      cascade(x-1,y)
+  if x < len(weights)-1:
+    if weights[x][y]+grid[x+1][y] < weights[x+1][y]:
+      weights[x+1][y] = weights[x][y]+grid[x+1][y]
+      cascade(x+1,y)
+  if y > 0:
+    if weights[x][y]+grid[x][y-1] < weights[x][y-1]:
+      weights[x][y-1] = weights[x][y]+grid[x][y-1]
+      cascade(x,y-1)
+  if y < len(weights[x])-1:
+    if weights[x][y]+grid[x][y+1] < weights[x][y+1]:
+      weights[x][y+1] = weights[x][y]+grid[x][y+1]
+      cascade(x,y+1)
+#end cascade()
+#cascade(0,0)
+
+grid = [ [ int(char) for char in line ] for line in lines ]
+
+weights = []
+for i in range(len(grid)):
+  weights.append([9999]*len(grid[i]))
+
+# Zero cost to "reach" the start point
+weights[0][0] = 0
+
+#stack = []
+#stack.append([0,0])
+
+#while len(stack) > 0:
+#  coords = stack.pop()
+#  x = coords[0]
+#  y = coords[1]
+#
+#  if x > 0:
+#    if weights[x][y]+grid[x-1][y] < weights[x-1][y]:
+#      weights[x-1][y] = weights[x][y]+grid[x-1][y]
+#      stack.append([x-1,y])
+#  if x < len(weights)-1:
+#    if weights[x][y]+grid[x+1][y] < weights[x+1][y]:
+#      weights[x+1][y] = weights[x][y]+grid[x+1][y]
+#      stack.append([x+1,y])
+#  if y > 0:
+#    if weights[x][y]+grid[x][y-1] < weights[x][y-1]:
+#      weights[x][y-1] = weights[x][y]+grid[x][y-1]
+#      stack.append([x,y-1])
+#  if y < len(weights[x])-1:
+#    if weights[x][y]+grid[x][y+1] < weights[x][y+1]:
+#      weights[x][y+1] = weights[x][y]+grid[x][y+1]
+#      stack.append([x,y+1])
+
+
+for y in range(len(grid)):
+  for x in range(len(grid[y])):
+#    if x > 0:
+#      weights[x-1][y] = min(weights[x-1][y],weights[x][y]+grid[x-1][y])
+    if x < len(weights)-1:
+      weights[x+1][y] = min(weights[x+1][y],weights[x][y]+grid[x+1][y])
+#    if y > 0:
+#      weights[x][y-1] = min(weights[x][y-1],weights[x][y]+grid[x][y-1])
+    if y < len(weights[x])-1:
+      weights[x][y+1] = min(weights[x][y+1],weights[x][y]+grid[x][y+1])
+
+for y in range(len(grid)):
+  for x in range(len(grid[y])):
+    if x > 0:
+      weights[x-1][y] = min(weights[x-1][y],weights[x][y]+grid[x-1][y])
+      cascade(x-1,y)
+    if x < len(weights)-1:
+      weights[x+1][y] = min(weights[x+1][y],weights[x][y]+grid[x+1][y])
+      cascade(x+1,y)
+    if y > 0:
+      weights[x][y-1] = min(weights[x][y-1],weights[x][y]+grid[x][y-1])
+      cascade(x,y-1)
+    if y < len(weights[x])-1:
+      weights[x][y+1] = min(weights[x][y+1],weights[x][y]+grid[x][y+1])
+      cascade(x,y+1)
+
+
+
+
+
+#display(weights)
+print(weights[len(weights[0])-1][len(weights)-1])
+
+# Solution < 697
+

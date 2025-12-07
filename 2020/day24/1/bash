@@ -1,0 +1,72 @@
+#!/bin/bash
+
+inFile="${1}"
+
+# We're gonna try something crazy here:
+# Instead of ne, e, se, sw, w, nw,
+#   I'm gonna use a-f, counter-clockwise (so e=e)
+#   a /\ f
+#  b |  | e
+#   c \/ d
+# So let's start with a simple sed to rename everything:
+input=$( sed -e 's/nw/a/g' \
+             -e 's/sw/c/g' \
+             -e 's/se/d/g' \
+             -e 's/ne/f/g' "${inFile}" |
+         sed -e 's/w/b/g' )
+
+# Now, take a moment and consider how a square grid overlays a hex grid.
+# Seriously, open MSPaint or something.
+# Going up 1 hex tile increases my Y coord by 1
+#   But, that's impossible - I can only go up diagonally (ie: NE)
+#   If I go NE then NW though, I've gone up by 2
+# Going right 1 hex tile increases X by 1.
+# Going up-right increases X by 0.5, and Y by 1
+# Now, let's double everything so BASH's integer-math won't break things.
+# We get a hex grid like so:
+#     /// \\\ /// \\\
+#    | -1,2  |  1,2  |
+# /// \\\ /// \\\ /// \\\
+#  -2,0  |  0,0  |  2,0  |
+# \\\ /// \\\ /// \\\ ///
+#    | -1,-2 |  1,-2 |
+#     \\\ /// \\\ ///
+# Step 3: Profit.
+
+targetTiles=$(
+  while read LINE; do
+    xPos=0 # Origin
+    yPos=0 # Origin
+    while read -n 1 char; do
+      case "${char}" in
+        a) # Diagonals first:
+          xPos=$(( xPos - 1 ))
+          yPos=$(( yPos + 2 ))
+        ;;
+        c)
+          xPos=$((xPos-1))
+          yPos=$((yPos-2))
+        ;;
+        d)
+          xPos=$((xPos+1))
+          yPos=$((yPos-2))
+        ;;
+        f)
+          xPos=$((xPos+1))
+          yPos=$((yPos+2))
+        ;;
+        # Now horizontals:
+        b) xPos=$((xPos-2));;
+        e) xPos=$((xPos+2));;
+      esac
+    done <<<"${LINE}"
+    echo "${xPos},${yPos}"
+  done <<<"${input}"
+)
+
+blackTiles=0
+while read flips tile; do
+  [[ $((flips%2)) -eq 1 ]] && blackTiles=$((blackTiles+1))
+done < <(echo "${targetTiles}" | sort | uniq -c)
+echo "${blackTiles} black tiles"
+

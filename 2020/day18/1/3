@@ -1,0 +1,84 @@
+#!/bin/bash
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function tokenize() {
+  local expr="${@}"
+  grep -Po '(\d+|\+|\*|\(|\))' <<<"${expr}"
+}
+
+# Basically, 'eval' - but that word's taken
+# expr:
+#   \d+
+#   expr op expr
+#   ( expr )
+# op:
+#   + or *
+function parse() {
+  local expr="${@}"
+  expr=$( tokenize "${expr}" )
+
+  
+
+
+
+
+
+
+  local nextToken
+  read nextToken <<<"${expr}"
+
+  if [[ "${nextToken}" == '(' ]]; then
+
+
+  fi
+
+
+
+  local subExpr=$( grep -Po '\(.*\)' <<<"${expr}" )
+  subExpr=$( sed -r 's/(^\s*\(|\)\s*$)//g' <<<"${subExpr}" )
+
+  local result=$( parse 
+  # If there are parens, do those first:
+  if grep -qP '\(.*\)' <<<"${expr}"; then
+    
+  fi
+
+  for token in $(tokenize ${expr}); do
+    case "${token}" in
+      '*') 
+    esac
+  done
+}
+
+
+function add() {
+
+}
+
+function mult() {
+
+}
+
+
+
+inFile="${1}"
+
+while read LINE; do
+  parse "${LINE}"
+done # | sum
+

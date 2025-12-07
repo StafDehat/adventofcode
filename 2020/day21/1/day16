@@ -1,0 +1,182 @@
+#!/bin/bash
+
+inFile="${1}"
+
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function product() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "1";
+    for x in ${input}; do
+      echo -n " * ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+
+function isInvalidNum() {
+  local num="${1}"
+  #debug "Testing number: ${num}"
+  while read range1 or range2; do
+    read min max <<<"${range1/-/ }"
+    #debug "Testing if ${num} between ${min} & ${max}"
+    if [[ ${num} -ge ${min} ]] && 
+       [[ ${num} -le ${max} ]]; then
+      #debug "Valid"
+      return 1 #Valid.  ie:Not invalid
+    fi
+    read min max <<<"${range2/-/ }"
+    #debug "Testing if ${num} between ${min} & ${max}"
+    if [[ ${num} -ge ${min} ]] && 
+       [[ ${num} -le ${max} ]]; then
+      #debug "Valid"
+      return 1 #Valid.  ie:Not invalid
+    fi
+  done < <( echo "${fields}" | cut -d: -f2- )
+  #debug "Invalid"
+  return 0
+}
+
+function getInvalidNums() {
+  local ticket="${1}"
+  local num
+  for num in $( tr ',' ' ' <<<"${ticket}" ); do
+    isInvalidNum "${num}" && echo "${num}"
+  done
+}
+
+# Print a list of fields this number would be valid for
+function getValidFields() {
+  local num="${1}"
+  local field=""
+  while read LINE; do
+    #debug "Testing ${num} for validity in ${LINE}"
+    field=$( cut -d: -f1 <<<"${LINE}" )
+    read range1 or range2 < <( cut -d: -f2- <<<"${LINE}" )
+    read min1 max1 min2 max2 <<<"${range1/-/ } ${range2/-/ }"
+    if [[ ${num} -lt ${min1} || ${num} -gt ${max1} ]] &&
+       [[ ${num} -lt ${min2} || ${num} -gt ${max2} ]]; then
+      continue
+    fi
+    echo "${field}"
+  done <<<"${fields}"
+}
+
+# Trim just the fields portion:
+fields=$( 
+  sed -n '1,/^your ticket:/p' "${inFile}" |
+    grep -vP '^(your ticket:|\s*)$'
+)
+# Trim just MY ticket portion:
+myTicket=$( 
+  sed -n '/^your ticket:/,/^nearby tickets:/p' ${inFile} |
+    grep -P '(\d+,)*\d+'
+)
+# Trim just nearby tickets:
+nearbyTickets=$( 
+  sed -n '/^nearby tickets:/,$p' ${inFile} |
+    grep -P '(\d+,)*\d+'
+)
+
+validTickets=$(
+  while read ticket; do
+    # If the ticket contains any invalid fields, discard it:
+    invalidNums=$( getInvalidNums "${ticket}" )
+    [[ ! -z "${invalidNums}" ]] && continue
+    echo "${ticket}"
+  done <<<"${nearbyTickets}"
+)
+
+debug "Valid tickets identified"
+
+# We're gonna use files now - each file is named the field# it represents.
+# ie: The '1'st field's possibilities are listed in file '1'
+rm -rf fields
+mkdir -p fields
+cd fields
+
+
+# Read every number, in every validTicket.
+# For each of those numbers, print the name of every field for which it would be valid.
+# Save those fieldNames in the fieldNumber's file.
+# ie: If the '2'nd number is valid for field 'seat', print 'seat' into file '2'
+#     If it's *also* valid for field 'type', then *also* print 'type' into file '2'
+while read ticket; do
+  currentField=1
+  for num in ${ticket//,/ }; do
+    num=$( cut -d, -f${currentField} <<<"${ticket}" )
+    getValidFields "${num}" >> "${currentField}"
+    currentField=$(( currentField+1 ))
+  done
+done <<<"${validTickets}"
+debug "Per-ticket valid fields identified"
+debug "Still need to compare valid fields cross-tickets"
+
+# If *every* ticket printed the same fieldName to the same fieldNumber, then that fieldNumber
+#   might actually represent that fieldName.
+# ie: If all 237 tickets printed 'seat' into file '2', then the '2'nd field might be 'seat'.
+# Not done yet though - each fieldNumber might be >1 fieldName
+# ie: The '2'nd field might be valid for *both* 'seat' and 'type'
+# At the end of this loop, all we know is *all* the fields that any given position *might* be.
+numTickets=$( wc -l <<<"${validTickets}" )
+for field in *; do
+  possibilities=$( cat "${field}" | sort | uniq -c | grep -P "^\s*${numTickets}\s" | grep -Po '[a-z].*$' )
+  echo "${possibilities}" > "${field}"
+done
+debug "Field names per field position, validity identified"
+debug "Still need to exlude duplicate validities (ie: Field 1 & 2 might both be valid for 'seat')"
+
+# Now we eliminate possibilities.
+# ie: If Pos1 could be 'seat' *or* 'type', but Pos2 can *only* be 'type', then we know
+#   Pos1 can't actually be 'type'.
+numDepartLines=$( grep -c "departure" <<<"${fields}" )
+while [[ $( cat * | grep -c departure ) -gt ${numDepartLines} ]]; do
+  for field in *; do
+    # If any field can only be 1 thing, remove its possibility from everything else
+    if [[ $( grep -cP '^[a-z]' "${field}" ) -eq 1 ]]; then
+      echo "${field} has only 1 line"
+      soloField=$( grep -P '^[a-z]' "${field}" )
+      sed -i "/^${soloField}\s*$/d" *
+      echo "${soloField}" > "${field}"
+    fi
+  done
+done
+
+echo "Departure Fields:"
+grep -l 'departure' *
+
+departFields=$( grep -l 'departure' * )
+for x in ${departFields}; do
+  cut -d, -f${x} <<<"${myTicket}"
+done | product
+
+
+
+

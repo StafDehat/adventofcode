@@ -1,0 +1,66 @@
+#!/bin/bash
+
+inFile="${1}"
+
+declare -A lastSpoken
+index=1
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function numAfter() {
+  # If that was the first time the number has been spoken, the current player says 0.
+  # Otherwise, the number had been spoken before; the current player
+  #   announces how many turns apart the number is from when it was previously spoken.
+  local x="${1}"
+  if [[ -z "${lastSpoken[${x}]}" ]]; then
+    # We haven't set that position yet, so that number's never been spoken:
+    echo 0
+    return
+  fi
+  # Not null, so we must have spoken it already - calculate how long ago:
+  echo $(( index - ${lastSpoken[${x}]} ))
+}
+
+
+# Print each number spoken, and which turn it was spoken on:
+function printLastList() {
+  echo "Index: ${index}"
+  echo "LastSpoken:"
+  for x in ${input[@]}; do
+    echo "${x}: ${lastSpoken[${x}]}"
+  done
+}
+
+
+# Initialize the lastSpoken list based on explicitly-given data:
+# In my case: 15,5,1,4,7,0
+# Sample data: 0,3,6
+input=( $( grep -Po '\d+' "${inFile}" ) )
+for num in ${input[@]}; do
+  lastSpoken[${num}]=${index}
+  index=$(( index+1 ))
+done
+last=${num}
+
+# The next number will be zero, because the explicit input had no duplicates:
+next=0
+
+while true; do
+  # When index=2020, we've already inserted that many entries
+  [[ "${index}" -ge 2020 ]] && break
+  last="${next}"
+  next=$( numAfter "${last}" )
+  #debug "Iteration #${index}"
+  #debug "Last number spoken was ${last}"
+  #debug "Next number will be ${next}"
+  lastSpoken[${last}]=${index}
+  index=$(( index + 1 ))
+  #debug "The ${index}th number spoken was ${next}"
+done
+
+echo "The ${index}th number spoken was ${next}"
+
+

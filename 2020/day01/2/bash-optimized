@@ -1,0 +1,83 @@
+#!/bin/bash
+# Usage: $0 input-file
+
+goalSum=2020
+
+# Create an array from only the numeric lines in input file
+declare -a input
+input=( $(
+  for x in $( grep -P '^\s*-?\s*\d+\s*$' "${1}" ); do
+    [[ ${x} -le ${goalSum} ]] && echo "${x}"
+  done
+) )
+
+#
+# Do an O(n) pre-process, to reduce n before we get to O(n^3)
+function getBiggerTwoOfSmallestThree() {
+  local -a lst
+  lst=( ${@} )
+
+  # The BASH way:
+  for x in ${lst[@]}; do
+    echo $x
+  done | sort -n | head -n 3 | tail -n 2 | xargs echo
+  return
+
+  # The everyone-else way:
+  local a=${goalSum}
+  local b=${goalSum}
+  local c=${goalSum}
+
+  for x in ${lst[@]}; do
+    if [[ $x -lt $a ]]; then
+      a=${x}
+    elif [[ $x -lt $b ]]; then
+      b=${x}
+    elif [[ $x -lt $c ]]; then
+      c=${x}
+    fi
+  done
+  {
+    echo ${a};
+    echo ${b};
+    echo ${c};
+  } | sort -n | tail -n 2 | xargs echo
+}
+read a b < <(getBiggerTwoOfSmallestThree ${input[@]})
+largestPossible=$(( goalSum - (a+b) ))
+echo "Bigger 2 of smallest 3 numbers in list are ${a} & ${b}"
+echo "2020 - [those] = ${largestPossible}, so any number >${largestPossible}, is too big"
+declare -a newInput
+for x in ${input[@]}; do
+  # Too big - skip it:
+  [[ ${x} -gt ${largestPossible} ]] && continue
+  # Not too big - add to newInput for future consideration
+  newInput[${#newInput[@]}]=${x}
+done
+echo "Reduced list size from ${#input[@]} to ${#newInput[@]}"
+
+
+# Count how many items in that array:
+numItems="${#newInput[@]}"
+
+# Iterate over the array (x)
+for x in $( seq 0 $((numItems-1)) ); do
+  numAtPosX=${newInput[${x}]}
+
+  # For inner loop (y), we can skip anything <x, because it would have
+  #   already compared itself to us, while it was x.
+  # Also, skip =x, because we don't want to compare a number to itself
+  for y in $( seq $((x+1)) $((numItems-1)) ); do
+    numAtPosY=${newInput[${y}]}
+
+    for z in $( seq $((y+1)) $((numItems-1)) ); do
+      numAtPosZ=${newInput[${z}]}
+      sum=$(( numAtPosX + numAtPosY + numAtPosZ ))
+      if [[ ${sum} -eq ${goalSum} ]]; then
+        echo $(( numAtPosX * numAtPosY * numAtPosZ ))
+        break 3
+      fi
+    done # End z
+  done # End y
+done # End x
+

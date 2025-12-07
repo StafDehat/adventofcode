@@ -1,0 +1,18 @@
+#!/bin/bash
+
+inFile="${1}"
+
+# The description of "seat" is really just a convoluted description of
+#   binary numbers:
+# F=0, B=1
+# L=0, R=1
+# Swap FBLR with 0101 respectively, then sort the binary numbers
+# The biggest number is our answer.
+seatIdBase2=$(
+  for seat in $( cat "${inFile}" ); do
+    tr 'FBLR' '0101' <<<"${seat}"
+  done | sort -n | tail -n 1
+)
+
+# But, they want the answer in base-10 (decimal), so convert it:
+echo $((2#${seatIdBase2}))

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+inFile="${1}"
+
+myStart=$( head -n 1 "${inFile}" | grep -Po '\d+' )
+declare -a busIds
+busIds=( $( tail -n +2 ${inFile} |
+              grep -Po '\d+,?' |
+              tr -d ',' ) )
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+
+timetable=$( 
+for busId in ${busIds[@]}; do
+  #echo "${busId}"
+  numTrips=$(( myStart / busId ))
+  #remainder=$(( myStart % busId ))
+  nextTime=$(( (numTrips+1) * busId ))
+  waitTime=$(( nextTime-myStart ))
+  echo "${nextTime} ${busId} ${waitTime}"
+  #echo "Bus ID ${busId} departs at ${nextTime}"
+done | sort -n
+)
+
+read departTime busId waitTime < <(echo "${timetable}" | head -n 1 )
+
+echo "Bus ID ${busId} departs at ${departTime} (${waitTime} minutes after your arrival)."
+echo $((waitTime*busId))
+

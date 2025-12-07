@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+
+
+class Bag(object):
+  # Color is essentially the "Bag ID" - a unique identifier
+  color = ""
+  # My contents, by colour & count:
+  contents = {}
+  # A list of Bag IDs (colors) that contain me
+  foundWithin = set()
+
+  def __init__(self, color):
+    self.color = color
+    self.contents = {}
+    self.foundWithin = set()
+  # END __init__()
+
+  def addContent(self, count, color):
+    self.contents[color] = count
+  # END addContent()
+# END class Bag()
+
+
+# --------------------------- #
+# BEGIN non-class definitions
+# --------------------------- #
+
+import os
+
+#
+# BEGIN Helper functions
+
+def createBag(bagDesc):
+  tmp = bagDesc.split(" contain ")
+
+  # Trim off " bag.*"
+  color = tmp[0]
+  color = color[0:color.find(" bag")]
+  newBag = Bag(color)
+
+  bagList = tmp[1].split(", ")
+  for x in range(len(bagList)):
+    # Trim "bag(s)" keywords
+    bagList[x] = bagList[x][0:bagList[x].find(" bag")]
+    if bagList[x] == "no other":
+      continue
+    spacePos=bagList[x].find(" ")
+    #print(bagList[x][0:spacePos], bagList[x][spacePos+1:])
+    newBag.addContent(
+      int(bagList[x][0:spacePos]),
+      bagList[x][spacePos+1:]
+    )
+  # END for
+
+  return newBag
+# END def createBag()
+
+# END Helper functions
+#
+
+
+
+
+# Fetch data from file
+os.chdir((os.path.dirname(os.path.realpath(__file__))))
+file = ("test")
+with open(file) as f:
+  bagLines = [line.rstrip('\n') for line in f]
+
+# This will keep track of all known Bags:
+bagDict = {}
+
+# Populate the bagDict
+for bagDesc in bagLines:
+  tmpBag = createBag(bagDesc)
+  bagDict[tmpBag.color] = tmpBag
+# END for
+
+
+
+
+# Print 'contains' data:
+print("'contains' data:")
+for key in bagDict:
+  bagObj = bagDict[key]
+  for color, count in bagObj.contents.items():
+    print(bagObj.color, "contains", count, color)
+  # END for
+# END for
+
+
+# Now that all bags are instantiated,
+# create reverse-contains entries (ie: foundWithin)
+for key in bagDict:
+  bagObj = bagDict[key]
+  for color, count in bagObj.contents.items():
+    bagDict[color].foundWithin.add(
+      bagObj.color
+    )
+  # END for
+# END for
+
+# Print 'foundWithin' data:
+print("'foundWithin' data:")
+for key in bagDict:
+  bagObj = bagDict[key]
+  for color in bagObj.foundWithin:
+    print(bagObj.color, "can be found within", color)
+  # END for
+# END for
+
+

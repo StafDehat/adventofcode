@@ -1,0 +1,38 @@
+#!/bin/bash
+# Usage: $0 input-file
+
+goalSum=2020
+
+# Create an array from only the numeric lines in input file
+declare -a input
+input=( $(
+  for x in $( grep -P '^\s*-?\s*\d+\s*$' "${1}" ); do
+    [[ ${x} -le ${goalSum} ]] && echo "${x}"
+  done
+) )
+
+
+# Count how many items in that array:
+numItems="${#input[@]}"
+
+# Iterate over the array (x)
+for x in $( seq 0 $((numItems-1)) ); do
+  numAtPosX=${input[${x}]}
+
+  # For inner loop (y), we can skip anything <x, because it would have
+  #   already compared itself to us, while it was x.
+  # Also, skip =x, because we don't want to compare a number to itself
+  for y in $( seq $((x+1)) $((numItems-1)) ); do
+    numAtPosY=${input[${y}]}
+
+    for z in $( seq $((y+1)) $((numItems-1)) ); do
+      numAtPosZ=${input[${z}]}
+      sum=$(( numAtPosX + numAtPosY + numAtPosZ ))
+      if [[ ${sum} -eq ${goalSum} ]]; then
+        echo $(( numAtPosX * numAtPosY * numAtPosZ ))
+        break 3
+      fi
+    done # End z
+  done # End y
+done # End x
+

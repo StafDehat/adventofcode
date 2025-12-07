@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+import re
+import collections
+
+def display(content):
+  for line in content:
+    print(line)
+#end display()
+
+def buildPairs(lines):
+  pairs = {}
+  for line in lines:
+    if re.match(r"^\s*[A-Z]{2}\s*->\s*[A-Z]\s*$", line):
+      pairs[line.split()[0]] = line.split()[2]
+  return pairs
+  #end for
+#end buildPairs()
+
+def getPolymer(lines):
+  for line in lines:
+    if re.match(r"^\s*[A-Z]+\s*$", line):
+      return list(line)
+#end getPolymer()
+
+def grow(polyCount, pairs):
+  global numChars
+  newPolyCount = collections.Counter()
+  for pair in polyCount.keys():
+    lChar = list(pair)[0]
+    rChar = list(pair)[1]
+    cChar = pairs[pair]
+    newPolyCount[lChar+cChar] += polyCount[pair]
+    newPolyCount[cChar+rChar] += polyCount[pair]
+    numChars[cChar] += polyCount[pair]
+  return newPolyCount
+#end grow()
+
+
+pairs = buildPairs(lines)
+polymer = getPolymer(lines)
+
+numChars = collections.Counter()
+for char in list(polymer):
+  numChars[char] += 1
+
+# Represent the polymer as a counter of base-pair occurrences
+polyCount = collections.Counter()
+for x in range(0,len(polymer)-1):
+  polyCount["".join(polymer[x:x+2])] += 1
+#end for
+
+for x in range(40):
+  polyCount = grow(polyCount, pairs)
+
+print(max(numChars.values()) - min(numChars.values()))
+

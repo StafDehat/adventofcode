@@ -1,0 +1,77 @@
+#!/bin/bash
+
+inFile="${1}"
+
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function isInvalidNum() {
+  local num="${1}"
+  debug "Testing number: ${num}"
+  while read range1 or range2; do
+    read min max <<<"${range1/-/ }"
+    debug "Testing if ${num} between ${min} & ${max}"
+    if [[ ${num} -ge ${min} ]] && 
+       [[ ${num} -le ${max} ]]; then
+      debug "Invalid"
+      return 1 #Not invalid
+    fi
+    read min max <<<"${range2/-/ }"
+    debug "Testing if ${num} between ${min} & ${max}"
+    if [[ ${num} -ge ${min} ]] && 
+       [[ ${num} -le ${max} ]]; then
+      debug "Invalid"
+      return 1 #Not invalid
+    fi
+  done < <( echo "${fields}" | cut -d: -f2- )
+  debug "Valid"
+  return 0
+}
+
+function getInvalidNums() {
+  local ticket="${1}"
+  local num
+  for num in $( tr ',' ' ' <<<"${ticket}" ); do
+    isInvalidNum "${num}" && echo "${num}"
+  done
+}
+
+# Trim just the fields portion:
+fields=$( 
+  sed -n '1,/^your ticket:/p' "${inFile}" |
+    grep -vP '^(your ticket:|\s*)$'
+)
+# Trim just MY ticket portion:
+myTicket=$( 
+  sed -n '/^your ticket:/,/^nearby tickets:/p' ${inFile} |
+    grep -P '(\d+,)*\d+'
+)
+# Trim just nearby tickets:
+nearbyTickets=$( 
+  sed -n '/^nearby tickets:/,$p' ${inFile} |
+    grep -P '(\d+,)*\d+'
+)
+
+while read ticket; do
+  getInvalidNums "${ticket}"
+done <<<"${nearbyTickets}" | sum
+

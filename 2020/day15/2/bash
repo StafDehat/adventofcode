@@ -1,0 +1,55 @@
+#!/bin/bash
+
+inFile="${1}"
+
+declare -a lastSpoken
+index=1
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+
+# Initialize the lastSpoken list based on explicitly-given data:
+# In my case: 15,5,1,4,7,0
+# Sample data: 0,3,6
+input=( $( grep -Po '\d+' "${inFile}" ) )
+for num in ${input[@]}; do
+  lastSpoken[${num}]=${index}
+  index=$(( index+1 ))
+done
+last=${num}
+
+# The next number will be zero, because the explicit input had no duplicates:
+next=0
+
+stopAt=30000000
+#stopAt=2020
+#stopAt=100000
+#stopAt=10
+
+while true; do
+  # When index=2020, we've already inserted that many entries
+  (( ${index} >= ${stopAt} )) && break
+
+  last=${next}
+  if [[ -z "${lastSpoken[${last}]}" ]]; then
+    next=0
+  else
+    next=$(( index - ${lastSpoken[${last}]} ))
+  fi
+
+  #debug "Speaking number ${index}: ${last}"
+
+  lastSpoken[${last}]=${index}
+  index=$(( index + 1 ))
+
+  # Debug messages, but not so many that we slow it down:
+  (( ${index} % 100000 == 0 )) && \
+    debug "The ${index}th number spoken was ${next}"
+done
+
+echo "The ${index}th number spoken was ${next}"
+
+

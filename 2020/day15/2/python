@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+lastSpoken = {}
+
+# Hard-coded initialization of *my* data:
+lastSpoken[15] = 1
+lastSpoken[5] = 2
+lastSpoken[1] = 3
+lastSpoken[4] = 4
+lastSpoken[7] = 5
+lastSpoken[0] = 6
+index = 6
+
+# The last number we added to the list:
+lastNum = 0
+
+# The next number will be zero, because the explicit input had no duplicates:
+nextNum = 0
+
+#stopAt = 2020
+stopAt = 30000000
+
+
+while True:
+  if ( index >= stopAt ):
+    break
+
+  lastNum = nextNum
+  if lastNum in lastSpoken:
+    nextNum = index - lastSpoken[lastNum]
+  else:
+    nextNum = 0
+
+  lastSpoken[lastNum] = index
+  index += 1
+
+
+print("The ", index, "th number spoken was ", nextNum)

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+inFile="${1}"
+
+function applyMask() {
+  local mask="${1}"
+  local val="${2}"
+
+  # We can't "ignore" X in a bitmask, so instead we'll:
+  #   AND while X=1, then
+  #   OR while X=0
+  local andMask=$(( 2#$( echo "${mask}" | tr X 1 ) ))
+  local orMask=$(( 2#$( echo "${mask}" | tr X 0 ) ))
+  echo $(( val & andMask | orMask ))
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+
+declare -a mem
+bitmask="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+while read cmd assignment value; do
+  if [[ "${cmd}" == "mask" ]]; then
+    bitmask="${value}"
+  fi
+  if grep -q "mem" <<<"${cmd}"; then
+    addr=$( grep -Po '\d+' <<<"${cmd}" )
+    mem[${addr}]=$( applyMask ${bitmask} ${value} )
+  fi
+done < "${inFile}"
+
+sum ${mem[@]}
+

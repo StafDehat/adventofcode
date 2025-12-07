@@ -1,0 +1,68 @@
+#!/bin/bash
+
+inFile="${1}"
+
+function debug() {
+  echo "${@}" >&2
+}
+
+function countPaths() {
+  local index="${1}"
+
+  # If we've already calculated this, use the cached value:
+  debug "Cache: ${pathsFromPos[@]}"
+  if [[ ${pathsFromPos[${index}]} -ge 0 ]]; then
+    debug "Already calculated paths from this point."
+    echo "${pathsFromPos[${index}]}"
+    return 0
+  fi
+
+  # Only one path left.  Take it.
+  # If:  Index=3, numSteps=5
+  # Then: Only 1 route from steps[3] to steps[4]
+  if [[ $((numSteps-index)) -le 2  ]]; then
+    #debug "(1) Setting pathsFromHere[${index}]=1"
+    pathsFromPos[${index}]=1
+    echo 1
+    #debug "Result: ${pathsFromPos[@]}"
+    return 0
+  fi
+
+  #
+  # Potentially multiple paths left - calculate them
+  local pathsFromHere=0
+  local subPaths=0
+
+  # Take at least 1 step
+  local x=1
+  local stepSize=$(( ${steps[$((index+x))]} - ${steps[${index}]} ))
+  while true; do
+    stepSize=$(( ${steps[$((index+x))]} - ${steps[${index}]} ))
+    [[ ${stepSize} -gt 3 ]] && break
+    subPaths=$( countPaths $((index+x)) )
+    debug "Sub paths from pos $((index+1)): ${subPaths}"
+    pathsFromHere=$(( pathsFromHere + subPaths ))
+    x=$((x+1))
+  done
+  pathsFromPos[${index}]=${pathsFromHere}
+  echo "${pathsFromHere}"
+  #debug "Found ${total} paths from index ${index}"
+  #debug "(2) Setting pathsFromHere[${index}]=${total}"
+  #pathsFromHere[${index}]=${total}
+  #debug "Result: ${pathsFromHere[@]}"
+}
+
+steps=( 0 $( cat "${inFile}" | sort -n ) )
+goal=$( cat "${inFile}" | sort -n | tail -n 1 )
+goal=$(( goal + 3 ))
+steps[${#steps[@]}]=${goal}
+numSteps=${#steps[@]}
+
+declare -a pathsFromPos
+for x in $( seq 0 $((numSteps-1)) ); do
+  pathsFromPos[${x}]=-1
+done
+debug "${pathsFromHere[@]}"
+
+countPaths ${steps[@]}
+

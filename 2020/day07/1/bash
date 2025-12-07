@@ -1,0 +1,33 @@
+#!/bin/bash
+
+inFile=$( readlink -f "${1}" )
+
+rm -rf links
+mkdir links
+cd links
+
+while read LINE; do
+  thisBag=$( grep -Po '^.*bags contain' <<<"${LINE}" |
+               sed 's/ bags contain//' )
+  contents=$(
+    grep -Po 'bags contain.*$' <<<"${LINE}" |
+      tr ',' '\n' |
+      sed -e 's/bags contain//' \
+          -e 's/\s*[0-9]\+\s*//g' \
+          -e 's/\s*bags\?\.\?\s*$//'
+  )
+  
+  mkdir -p "${thisBag}"
+  (
+    cd "${thisBag}"
+    while read content; do
+      ln -s ../"${content}"
+    done <<<"${contents}"
+  )
+done < "${inFile}"
+
+find -L . -mindepth 2 -name 'shiny gold' |
+  cut -d/ -f2 |
+  sort -u |
+  wc -l
+

@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Strip those annoying newlines, & blank lines
+lines = [line.strip() for line in lines if line != '\n']
+
+#
+# The Meat
+
+# Create a list from the randomly-selected numbers
+# Create a list of boards
+# Loop:
+#   read a random number
+#   check off that number on all boards
+#   check if any boards won, && break
+#   output: The winning board, & the number that caused the win
+# Calculate score of winning board
+
+# Take list of 5 strings, return a 'board'
+# A board example:
+# [ [14, 21, 17, 24,  4]
+#   [10, 16, 15,  9, 19]
+#   [18,  8, 23, 26, 20]
+#   [22, 11, 13,  6,  5]
+#   [2,   0, 12,  3,  7] ]
+def createBoard(lines):
+  board = []
+  for line in lines:
+    board.append([int(item) for item in line.split()])
+  return board
+#end createBoard()
+
+def printBoard(board):
+  length_list = [len(str(element)) for row in board for element in row]
+  column_width = max(length_list)
+  for row in board:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end printBoard()
+
+def create_getXthItem(x):
+  def getXthItem(lst):
+    return lst[x]
+  return getXthItem
+#end create_getXthItem
+
+def isWinner(board, called):
+  for row in board:
+    sum = 0
+    for num in row:
+      if num in called:
+        sum += 1
+    if sum >= 5:
+      return True
+  # end for-row
+  for colNum in range(0,5):
+    sum = 0
+    for num in list(map(create_getXthItem(colNum),board)):
+      if num in called:
+        sum += 1
+    if sum >= 5:
+      return True
+  #end for-col
+  return False
+#end isWinner()
+
+def getWinner(boards, called):
+  for board in boards:
+    if isWinner(board, called):
+      return board
+      #printBoard(board)
+  return None
+#end getWinner()
+
+def getScore(board, called, lastCall):
+  sum = 0
+  for row in board:
+    for num in row:
+      if num not in called:
+        sum += num
+        debug("Not called: " + str(num) + " (sum=" + str(sum) + ")")
+      else:
+        debug("Called: " + str(num))
+    #end for-num
+  #end for-row
+  debug("Last called: " + str(lastCall))
+  return lastCall * sum
+#end getScore()
+
+
+#
+# callList is now a list of ints
+callList = [int(x) for x in lines[0].split(',')]
+# Build the list of boards
+boards = []
+linePtr = 1
+while True:
+  boards.append( createBoard(lines[linePtr:linePtr+5]) )
+  linePtr += 5
+  if linePtr >= len(lines):
+    break
+#end while
+
+
+#
+# Play the game
+# Call 5 numbers before we bother checking for winners:
+callPtr = 4
+while callPtr < len(callList):
+  thisNum = callList[callPtr]
+  # Delete winning boards
+  for index in reversed(range(0, len(boards))):
+    if isWinner(boards[index], set(callList[0:callPtr+1])):
+      del boards[index]
+  #end for
+  if len(boards) <= 1:
+    break
+  # Increment callPtr
+  callPtr += 1
+#end while
+
+# The only board left at this point, is the loser
+loser = boards[0]
+
+# But what will its score be, when it does eventually win?
+while callPtr < len(callList):
+  thisNum = callList[callPtr]
+  if isWinner(loser, set(callList[0:callPtr+1])):
+    break
+  callPtr += 1
+#end while
+
+#
+# Score the losing board
+score = getScore(loser, set(callList[0:callPtr+1]), callList[callPtr])
+
+
+#
+# Announce victory
+print("Called numbers:", callList[0:callPtr+1])
+print("Winning board:")
+printBoard(loser)
+print( "Winning score:", score)
+
+
+
+
+
+
+

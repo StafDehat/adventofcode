@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# This yeilds 419, but that's too high.
+#subValid=$( perl -ne "/^(${rule42})+(${rule31})+$/ && print" "${inFile}" )
+# Also, it must be >=265
+
+# This finds 407:
+#subValid=$( pcregrep "^(${rule42})+(${rule42})+(${rule31})+$" "${inFile}" )
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function trimEdges() {
+  local LINE="${1}"
+  local prefix=""
+  local suffix=""
+  local count=0
+  #debug "Trimming line: ${LINE}"
+  while true; do
+    # This regex is so complex, that most tools can't handle it.
+    # "grep -P" breaks.  Sed breaks.  pcregrep is wonky.
+    # We're gonna use perl:
+    prefix=$( perl -ne "/^(${rule42}).*/ && print \$1" <<<"${LINE}" )
+    suffix=$( perl -ne "/^.*(${rule31})$/ && print \$1" <<<"${LINE}" )
+
+    # If rule42 no longer starts, or
+    #   rule31 no longer ends, or
+    #   the entire remaining string *is* rule42, then we're done
+    [[ -z "${prefix}" ]] && break
+    [[ -z "${suffix}" ]] && break
+    [[ "${prefix}" == "${LINE}" ]] && break
+
+    LINE=$( sed -e "s/^${prefix}//" -e "s/${suffix}$//" <<<"${LINE}" )
+    #debug "Removed ${prefix} & ${suffix} from ends"
+    count=$((count+1))
+  done
+  #debug "Trimmed ${count} times, resulting in ${LINE}"
+  echo "${LINE}"
+}
+
+
+inFile="${1}"
+
+msgs=$( grep -P '^[ab]+' "${inFile}" )
+
+# Toss all rules into a file
+grep -P '^\d+:' "${inFile}" | sort -n > ruleFile
+
+# For each rule X, replace every reference to X with
+#   the definition of X.
+lineNum=0
+while true; do
+  lineNum=$((lineNum+1))
+  LINE=$( sed -n "${lineNum}p" ruleFile )
+  [[ -z "${LINE}" ]] && break
+  ruleNum=$( cut -d: -f1 <<<"${LINE}" )
+  ruleDef=$( cut -d\  -f2- <<<"${LINE}" )
+  [[ ${ruleNum} -eq 8 ]] && continue
+  [[ ${ruleNum} -eq 11 ]] && continue
+  [[ ${ruleNum} -eq 42 ]] && continue
+  [[ ${ruleNum} -eq 31 ]] && continue
+  perl -pi -e "s/(?<=\s)${ruleNum}(?=\s|$)/( ${ruleDef} )/g" ruleFile
+done
+
+# Turn rules into a regex
+rule31=$( grep '^31:' ruleFile |
+            cut -d\  -f2- |
+            tr -d ' "' |
+            sed 's/(\([ab]\))/\1/g' )
+rule42=$( grep '^42:' ruleFile |
+            cut -d\  -f2- |
+            tr -d ' "' |
+            sed 's/(\([ab]\))/\1/g' )
+
+
+subValid=$( pcregrep "^(${rule42})+(${rule42})+(${rule31})+$" "${inFile}" )
+
+numValid=0
+while read LINE; do
+  # If I chop rule42 off the front, and rule31 off the back, until the back isn't rule31 anymore
+  #   then I should be left with only rule42 remaining.
+  # I *always* know there's at least 2 rule42 at start, and 1 rule31 at end, because of how
+  #   we defined "subValid" above.
+
+  LINE=$( trimEdges "${LINE}" )
+
+  # After trimming, we should be left with 1 or more rule42's:
+  if pcregrep -q "^(${rule42})+$" <<<"${LINE}"; then
+    numValid=$((numValid+1))
+  #  echo "Valid: ${LINE}"
+  #else
+  #  echo "INVALID: ${LINE}"
+  fi
+done <<<"${subValid}"
+
+
+echo "Valid messages: ${numValid}"
+
+
+
+
+
+

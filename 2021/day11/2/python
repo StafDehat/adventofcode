@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+  
+import sys
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+grid = []
+for line in lines:
+  grid.append( [int(num) for num in list(line)] )
+
+def display(grid):
+  print()
+  for row in grid:
+    print(row)
+#end display()
+
+def flash(rowNum,colNum):
+  global grid
+  numRows = len(grid)
+  numCols = len(grid[0])
+  # Flash up
+  if rowNum > 0:
+    grid[rowNum-1][colNum] += 1
+    # Up-Left
+    if colNum > 0:
+      grid[rowNum-1][colNum-1] += 1
+    # Up-right
+    if colNum < numCols-1:
+      grid[rowNum-1][colNum+1] += 1
+  # Flash down
+  if rowNum < numRows-1:
+    grid[rowNum+1][colNum] += 1
+    # Down-left
+    if colNum > 0:
+      grid[rowNum+1][colNum-1] += 1
+    # Down-right
+    if colNum < numCols-1:
+      grid[rowNum+1][colNum+1] += 1
+  # Flash left
+  if colNum > 0:
+    grid[rowNum][colNum-1] += 1
+  # Flash right
+  if colNum < numCols-1:
+    grid[rowNum][colNum+1] += 1
+#end flash()
+
+def step():
+  global grid
+  # Keep track of how many flash this step - return it later
+  flashCount = 0
+
+  # Increment everything by 1
+  grid = [[y+1 for y in x] for x in grid]
+
+  numRows = len(grid)
+  numCols = len(grid[0])
+
+  # Octopods can only flash once per step, so keep track of which ones already did
+  flashed = []
+  for rowNum in range(len(grid)):
+    flashed.append([False]*numCols)
+
+  # Identify every octopod that's going to flash
+  # Increment values as a result of flashes as we go
+  while True:
+    static = True
+    for rowNum in range(numRows):
+      for colNum in range(numCols):
+        if not flashed[rowNum][colNum] and grid[rowNum][colNum] > 9:
+          flash(rowNum,colNum)
+          flashed[rowNum][colNum] = True
+          static = False
+      #end for
+    #end for
+    # If no flashes occur, break
+    if static:
+      break
+  #end while
+
+  # Reset every flashed octopod to 0
+  for rowNum in range(numRows):
+    for colNum in range(numCols):
+      if flashed[rowNum][colNum]:
+        flashCount += 1
+        grid[rowNum][colNum] = 0
+
+  return flashCount
+#end step()
+
+display(grid)
+flashes = 0
+numSteps = 0
+while True:
+  numSteps += 1
+  flashes = step()
+  if flashes == 100:
+    print(numSteps)
+    break
+
+
+
+
+
+

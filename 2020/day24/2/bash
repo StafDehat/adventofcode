@@ -1,0 +1,382 @@
+#!/bin/bash
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo "${ts}: ${@}" >&2
+}
+
+function sum() {
+  local input
+  if [[ "${#}" -gt 0 ]]; then
+    input=${@}
+  else
+    input=$( cat )
+  fi
+  {
+    echo -n "0";
+    for x in ${input}; do
+      echo -n " + ${x}"
+    done;
+    echo;
+  } | bc -l
+}
+
+function printFloor() {
+  echo -ne "Rows\t"
+  for x in $( seq ${xMin} ${xMax} ); do
+    if [[ ${x} -eq 0 ]]; then
+      echo -n 0
+    else
+      echo -n ' '
+    fi
+  done
+  echo
+
+  y=${yMin}
+  while [[ ${y} -le ${yMax} ]]; do
+    echo -ne "Row${y}:\t"
+    for x in $( seq ${xMin} ${xMax} ); do
+      if [[ $((x%2)) -eq 0 ]]; then
+        if [[ $((y%4)) -ne 0 ]]; then
+          echo -n ' '; continue
+        fi
+      else
+        if [[ $((y%4)) -eq 0 ]]; then
+          echo -n ' '; continue
+        fi
+      fi
+      tile=${floor[$x,$y]}
+      echo -n "${tile:-0}"
+    done
+    echo
+    y=$((y+2))
+  done
+}
+
+function getNeighbours() {
+  #      /// \\\ /// \\\
+  #     | -1,2  |  1,2  |
+  #  /// \\\ /// \\\ /// \\\
+  # | -2,0  |  0,0  |  2,0  |
+  #  \\\ /// \\\ /// \\\ ///
+  #     | -1,-2 |  1,-2 |
+  #      \\\ /// \\\ ///
+
+  local xPos="${1}"
+  local yPos="${2}"
+
+  echo "$((xPos+2)) ${yPos}"     # E
+  echo "$((xPos-2)) ${yPos}"     # W
+  echo "$((xPos+1)) $((yPos+2))" # NE
+  echo "$((xPos-1)) $((yPos+2))" # SE
+  echo "$((xPos+1)) $((yPos-2))" # NW
+  echo "$((xPos-1)) $((yPos-2))" # SW
+}
+
+function isBlack() {
+  local xPos="${1}"
+  local yPos="${2}"
+  if [[ -z "${floor[${xPos},${yPos}]}" ]]; then
+    return 1
+  elif [[ ${floor[${xPos},${yPos}]} -eq 0 ]]; then
+    return 1
+  fi
+  return 0
+}
+
+function countBlackNeighbours() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local neighbourCoords="$( getNeighbours ${xPos} ${yPos} )"
+  # Taking advantage of 0=inactive, 1=active
+  while read x y; do
+    echo "${floor[${x},${y}]}"
+  done <<<"${neighbourCoords}" | sum
+}
+
+function getNextState() {
+  local xPos="${1}"
+  local yPos="${2}"
+  local blackNeighbours=$(countBlackNeighbours ${xPos} ${yPos})
+
+  if isBlack ${xPos} ${yPos}; then
+    # Any black tile with zero or more than 2 black tiles immediately adjacent to it is flipped to white.
+    if [[ ${blackNeighbours} -eq 0 ]] ||
+       [[ ${blackNeighbours} -gt 2 ]]; then
+      echo 0 # White
+      return
+    fi
+  else
+    # Any white tile with exactly 2 black tiles immediately adjacent to it is flipped to black.
+    if [[ ${blackNeighbours} -eq 2 ]]; then
+      echo 1 # Black
+      return
+    fi
+  fi
+  echo "${floor[${xPos},${yPos}]}" # No change
+}
+
+function changeState() {
+  local y
+  local x
+  y=${yMin}
+  while [[ ${y} -le ${yMax} ]]; do
+    x=${xMin}
+    # We only need to check half the x values on each row
+    if [[ $((${y/-/}%4)) -eq 0 ]]; then
+      # If y%4=0, x will be even
+      [[ $((${x/-/}%2)) -eq 1 ]] && x=$((x+1))
+    else
+      # If y%4=2, x will be odd
+      [[ $((${x/-/}%2)) -eq 0 ]] && x=$((x+1))
+    fi
+    # Now do the copies
+    while [[ ${x} -le ${xMax} ]]; do
+      floor[${x},${y}]=${nextFloor[${x},${y}]}
+      x=$((x+2))
+    done
+    y=$((y+2))
+  done
+}
+
+function trimBoundaries() {
+  local shrinkable
+  local x
+  local y
+
+  # Attempt to narrow X-Min, twice
+  for attempt in {1..2}; do
+    shrinkable="True"
+    y=${yMin}
+
+    if [[ $((${xMin/-/}%2)) -eq 0 ]]; then
+      # If x is even, then y will be divisible by 4
+      [[ $((${y/-/}%4)) -eq 0 ]] || y=$((y+2))
+    else
+      # If x is odd, then y wont be divisible by 4
+      [[ $((${y/-/}%4)) -eq 0 ]] && y=$((y+2))
+    fi
+
+    while [[ ${y} -le ${yMax} ]]; do
+      if isBlack ${xMin} ${y}; then
+        shrinkable="False"
+        break 2
+      fi
+      y=$((y+4))
+    done
+    if [[ "${shrinkable}" == "True" ]]; then
+      debug "X layer ${xMin} is *all* white - removing that whole layer"
+      xMin=$(( xMin+1 ))
+    fi
+  done
+
+  # Attempt to narrow X-Max, twice
+  for attempt in {1..2}; do
+    shrinkable="True"
+    y=${yMin}
+
+    if [[ $((${xMax/-/}%2)) -eq 0 ]]; then
+      # If x is even, then y will be divisible by 4
+      [[ $((${y/-/}%4)) -eq 0 ]] || y=$((y+2))
+    else
+      # If x is odd, then y wont be divisible by 4
+      [[ $((${y/-/}%4)) -eq 0 ]] && y=$((y+2))
+    fi
+
+    while [[ ${y} -le ${yMax} ]]; do
+      if isBlack ${xMax} ${y}; then
+        shrinkable="False"
+        break 2
+      fi
+      y=$((y+4))
+    done
+    if [[ "${shrinkable}" == "True" ]]; then
+      debug "X layer ${xMax} is *all* white - removing that whole layer"
+      xMax=$(( xMax-1 ))
+    fi
+  done
+
+  # Attempt to narrow Y Min:
+  shrinkable="True"
+  x=${xMin}
+  # We only need to check half the x values on each row
+  if [[ $((${yMin/-/}%4)) -eq 0 ]]; then
+    # If yMin%4=0, x will be even
+    [[ $((${x/-/}%2)) -eq 1 ]] && x=$((x+1))
+  else
+    # If yMin%4=2, x will be odd
+    [[ $((${x/-/}%2)) -eq 0 ]] && x=$((x+1))
+  fi
+  while [[ ${x} -le ${xMax} ]]; do
+    if isBlack ${x} ${yMin}; then
+      shrinkable="False"
+      break
+    fi
+    x=$((x+2))
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "Y layer ${yMin} is *all* white - removing that whole layer"
+    yMin=$(( yMin+2 ))
+  fi
+
+  # Attempt to narrow Y Max:
+  shrinkable="True"
+  x=${xMin}
+  # We only need to check half the x values on each row
+  if [[ $((${yMax/-/}%4)) -eq 0 ]]; then
+    # If yMin%4=0, x will be even
+    [[ $((${x/-/}%2)) -eq 1 ]] && x=$((x+1))
+  else
+    # If yMin%4=2, x will be odd
+    [[ $((${x/-/}%2)) -eq 0 ]] && x=$((x+1))
+  fi
+  while [[ ${x} -le ${xMax} ]]; do
+    if isBlack ${x} ${yMax}; then
+      shrinkable="False"
+      break 
+    fi
+    x=$((x+2))
+  done
+  if [[ "${shrinkable}" == "True" ]]; then
+    debug "Y layer ${yMax} is *all* white - removing that whole layer"
+    yMax=$(( yMax-2 ))
+  fi
+}
+
+
+
+##################
+# Real code, yay #
+##################
+
+inFile="${1}"
+
+# This thing grows dynamically, so we need to track our coordinate bounds:
+xMin=0
+xMax=$(( $( head -n 1 "${inFile}" | tr -d '\n' | wc -c ) - 1 ))
+yMin=0
+yMax=$(( $( wc -l < "${inFile}" ) - 1 ))
+
+
+
+# We're gonna try something crazy here:
+# Instead of ne, e, se, sw, w, nw,
+#   I'm gonna use a-f, counter-clockwise (so e=e)
+#   a /\ f
+#  b |  | e
+#   c \/ d
+# So let's start with a simple sed to rename everything:
+input=$( sed -e 's/nw/a/g' \
+             -e 's/sw/c/g' \
+             -e 's/se/d/g' \
+             -e 's/ne/f/g' "${inFile}" |
+         sed -e 's/w/b/g' )
+
+# Now, take a moment and consider how a square grid overlays a hex grid.
+# Seriously, open MSPaint or something.
+# Going up 1 hex tile increases my Y coord by 1
+#   But, that's impossible - I can only go up diagonally (ie: NE)
+#   If I go NE then NW though, I've gone up by 2
+# Going right 1 hex tile increases X by 1.
+# Going up-right increases X by 0.5, and Y by 1
+# Now, let's double everything so BASH's integer-math won't break things.
+# We get a hex grid like so:
+#     /// \\\ /// \\\
+#    | -1,2  |  1,2  |
+# /// \\\ /// \\\ /// \\\
+#  -2,0  |  0,0  |  2,0  |
+# \\\ /// \\\ /// \\\ ///
+#    | -1,-2 |  1,-2 |
+#     \\\ /// \\\ ///
+# Step 3: Profit.
+
+targetTiles=$(
+  while read LINE; do
+    xPos=0 # Origin
+    yPos=0 # Origin
+    while read -n 1 char; do
+      case "${char}" in
+        a) # Diagonals first:
+          xPos=$(( xPos - 1 ))
+          yPos=$(( yPos + 2 ))
+        ;;
+        c)
+          xPos=$((xPos-1))
+          yPos=$((yPos-2))
+        ;;
+        d)
+          xPos=$((xPos+1))
+          yPos=$((yPos-2))
+        ;;
+        f)
+          xPos=$((xPos+1))
+          yPos=$((yPos+2))
+        ;;
+        # Now horizontals:
+        b) xPos=$((xPos-2));;
+        e) xPos=$((xPos+2));;
+      esac
+    done <<<"${LINE}"
+    echo -e "${xPos} ${yPos}"
+  done <<<"${input}"
+)
+
+blackTiles=$(
+  while read flips x y; do
+    if [[ $((flips%2)) -eq 1 ]]; then
+      echo "${x} ${y}"
+    fi
+  done < <(echo "${targetTiles}" | sort | uniq -c)
+)
+echo "Black tiles:"
+echo "${blackTiles}"
+
+# This thing grows dynamically, so we need to track our coordinate bounds:
+xMin=$( cut -d\  -f1 <<<"${blackTiles}" | sort -n | head -n 1 )
+xMax=$( cut -d\  -f1 <<<"${blackTiles}" | sort -n | tail -n 1 )
+yMin=$( cut -d\  -f2 <<<"${blackTiles}" | sort -n | head -n 1 )
+yMax=$( cut -d\  -f2 <<<"${blackTiles}" | sort -n | tail -n 1 )
+
+# Build a 2d-array representing the floor
+declare -A floor
+while read xPos yPos; do
+  # 0 = White
+  # 1 = Black
+  floor[${xPos},${yPos}]=1
+done <<<"${blackTiles}"
+
+# View it:
+debug "Start state:"
+printFloor
+
+# Iterate the changes:
+declare -A nextFloor
+for iteration in {1..100}; do
+  trimBoundaries
+
+  # Decrement min
+  xMin=$((xMin-1))
+  yMin=$((yMin-2))
+  # Increment max
+  xMax=$((xMax+1))
+  yMax=$((yMax+2))
+
+  # Have each tile figure out its next state
+  # Note: This could be parallelized
+  for y in $(seq ${yMin} ${yMax}); do
+    for x in $(seq ${xMin} ${xMax}); do
+      nextState=$( getNextState ${x} ${y} )
+      nextFloor[${x},${y}]=${nextState}
+    done
+  done
+
+  debug "Current state: $(echo "${floor[@]}" | sum)"
+  debug "Next state:    $(echo "${nextFloor[@]}" | sum)"
+
+  # Copy nextPocketState into pocketState
+  changeState
+
+  debug "Day ${iteration}: $(echo "${floor[@]}" | sum)"
+  printFloor
+done
+

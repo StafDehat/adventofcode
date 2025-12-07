@@ -1,0 +1,74 @@
+#!/bin/bash
+
+inFile=$( readlink -f "${1}" )
+
+rm -rf links
+mkdir links
+cd links
+
+while read LINE; do
+  thisBag=$( grep -Po '^.*bags contain' <<<"${LINE}" |
+               sed 's/ bags contain//' )
+  contents=$(
+    grep -Po 'bags contain.*$' <<<"${LINE}" |
+      tr ',' '\n' |
+      sed -e 's/bags contain//' \
+          -e 's/\s*\([0-9]\+\)\s*/\1 /g' |
+      sed -e 's/\s*bags\?\.\?\s*$//' |
+      grep -v 'no other'
+  )
+  
+  mkdir -p "${thisBag}"
+  (
+    cd "${thisBag}"
+    while read content; do
+      [[ -z "${content}" ]] && continue
+      count=$( grep -Po '^\d+' <<<"${content}" )
+      color=$( sed 's/[0-9]\+\s*//' <<<"${content}" )
+      ln -s ../"${color}" "${content}"
+    done <<<"${contents}"
+  )
+done < "${inFile}"
+
+#
+# Given a color of bag, count how many bags are inside it
+# Note: Does not count the bag itself - just contents!
+function countContents() {
+  local thisBag="${1}"
+  local contents=$(
+    cd "${thisBag}"
+    ls -1
+  )
+
+  local subBag
+  local subBagCount
+  local sum=0
+
+  local subBagContents=0
+  local subBagTotal=0
+
+  while read content; do
+    [[ -z "${content}" ]] && continue
+
+    # Per-iteration, content="X color"
+    # ie: 1 vibrant chartreuse
+    count=$( grep -Po '^\d+' <<<"${content}" )
+    color=$( sed 's/[0-9]\+\s*//' <<<"${content}" )
+
+    # A bag's total count ==
+    #   ( The bag itself (1) + Bags inside it ) * How many of that bag
+    subBagContents=$( countContents "${color}" )
+    subBagTotal=$(( (subBagContents+1) * count ))
+
+    sum=$(( sum + subBagTotal ))
+  done <<<"${contents}"
+
+  echo "${sum}"
+}
+
+
+bagsInGold=$( countContents "shiny gold" )
+echo "You have ${bagsInGold} bags within the shiny gold bag,"
+echo "  plus the shiny gold bag itself."
+
+

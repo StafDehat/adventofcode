@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+  
+import sys
+from copy import deepcopy
+
+# Debug function
+def debug(output):
+  print(output)
+#end debug()
+
+# CLI arg, input file
+if len(sys.argv) != 2:
+  print("ERR: Expect =1 arg; the file containing input")
+  exit(1)
+#end if
+try:
+  with open(sys.argv[1], 'r') as input:
+    lines = input.readlines()
+except:
+  print("ERR: Failed to open input file (%s)" % sys.argv[1])
+  exit(1)
+#end try
+
+# Nuke those newlines
+lines = [line.strip() for line in lines]
+
+# Debug function, for easier printing
+def print_r(lst):
+  length_list = [len(str(element)) for row in lst for element in row]
+  column_width = max(length_list)
+  for row in lst:
+    row = "".join(str(element).rjust(column_width + 2) for element in row)
+    print(row)
+#end print_r()
+
+
+#
+# The Meat
+
+def isSmall(cave):
+  return cave.islower()
+#end isSmall()
+def isLarge(cave):
+  return cave.isupper()
+#end isSmall()
+
+caves = set("-".join(lines).split("-"))
+
+paths = {}
+for cave in caves:
+  paths[cave] = set()
+for line in lines:
+  paths[line.split("-")[0]].add(line.split("-")[1])
+  paths[line.split("-")[1]].add(line.split("-")[0])
+
+
+def getRoutes(paths, history, urhere):
+  visited = set(history)
+  #print("At:", urhere)
+  #print("History:", history)
+  #print("Visited:", visited)
+  #print("Options:", getOptions(paths, visited, urhere))
+  #print()
+  routes = []
+  if urhere == "end":
+    #print(history+["end"])
+    routes.append(history+["end"])
+    return routes
+  for cave in getOptions(paths, history, urhere):
+    for route in getRoutes(paths, history+[urhere], cave):
+      routes.append(route)
+  return routes
+#end getRoutes()
+
+# Return set of nextHop options
+def getOptions(paths, history, urhere):
+  options = []
+  # If we're already at "end", there are no more options
+  if urhere == "end":
+    return options
+  for path in paths[urhere]:
+    # The start is never an option:
+    if path == "start":
+      continue
+    # Big caves are always an option:
+    if isLarge(path):
+      options.append(path)
+      continue
+    # Small caves are an option once/twice
+    if isSmall(path):
+      # Every small cave is an option once
+      if path not in set(history):
+        options.append(path)
+        continue
+      # If *any* small caves have been revisited, then *none* are allowed a second time
+      # I'm considering revisiting a small cave - it's only an option if I haven't revisited one yet
+      if not isSmallDupe(history+[urhere]):
+        options.append(path)
+      continue
+  return options
+#end getPaths()
+
+def isSmallDupe(caves):
+  for cave in set(caves):
+    if isLarge(cave):
+      continue
+    if caves.count(cave) > 1:
+      return True
+  return False
+#end isSmallDupe()
+
+routes = getRoutes(paths, [], "start")
+for route in routes:
+  print(route)
+print(len(routes))
+
+

@@ -1,0 +1,36 @@
+#!/bin/bash
+
+inFile="${1}"
+
+numLines=$( cat "${inFile}" | wc -l )
+head -n $(( numLines/2 )) "${inFile}" | grep -Po '^\d+' >p1
+tail -n $(( numLines/2 )) "${inFile}" | grep -Po '^\d+' >p2
+
+while true; do
+  # Draw top cards:
+  p1Card=$( head -n 1 p1 )
+  p2Card=$( head -n 1 p2 )
+
+  # If either fails to draw (out), game-over:
+  [[ -z "${p1Card}" ]] && break
+  [[ -z "${p2Card}" ]] && break
+
+  # Delete drawn cards from decks
+  sed -i '1d' p1 p2
+
+  # Resolve the conflict
+  if [[ ${p1Card} -gt ${p2Card} ]]; then
+    echo -e "${p1Card}\n${p2Card}" >> p1
+  else
+    echo -e "${p2Card}\n${p1Card}" >> p2
+  fi
+done
+
+index=1
+score=0
+for card in $( tac p1 p2 ); do
+  score=$(( score + card*index ))
+  index=$((index+1))
+done
+
+echo "${score}"

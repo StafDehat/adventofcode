@@ -1,0 +1,79 @@
+#!/bin/bash
+
+inFile="${1}"
+
+#myStart=$( head -n 1 "${inFile}" | grep -Po '\d+' )
+declare -a departures
+departures=( $( grep ',' ${inFile} |
+                  grep -Po '(\d+|x),?' |
+                  tr -d ',' ) )
+
+function debug() {
+  local ts=$( date +"%F %T.%N" )
+  echo -e "${ts}: ${@}" >&2
+}
+
+function gcd() {
+  if (( ${2} == 0 )); then
+    echo 0; return
+  fi
+  if (( ${1} % ${2} == 0)); then
+    echo ${2}
+    return
+  fi
+  gcd ${2} $(( ${1} % ${2} ))
+}
+alias gcf=gcd
+
+function lcm() {
+  if (( ${2} == 0 )); then
+    echo 0; return
+  fi
+  if (( ${#} == 2 )); then
+    echo $(( ${1} * ${2} / $( gcd ${1} ${2} ) ))
+    return
+  elif (( ${#} <= 1 )); then
+    echo ${1}
+    return
+  fi
+  local a=${1}
+  shift 1
+  lcm ${a} $( lcm ${@} )
+}
+alias lcf=lcm
+
+# Indexed by busID, offsets from t=0
+declare -a offsets
+index=0
+for busId in ${departures[@]}; do
+  [[ "${busId}" != "x" ]] && offsets[${busId}]=${index}
+  index=$(( index+1 ))
+done
+
+# Start counting by 1s
+# When we find a bus that's leaving at the correct offset, we know that all
+#   future increments must be a multiple of both the previous 'incr', and also
+#   of the current BusID.  Any increment that isn't also a multiple of the BusID
+#   would break that BusID's alignment.
+x=0 # I'm curious how many iterations it takes
+t=0
+incr=1
+for busId in "${departures[@]}"; do
+  [[ "${busId}" == "x" ]] && continue
+  debug "Incrementing time by ${incr} minute(s) per iteration"
+  while true; do
+    if [[ $(( ( t+${offsets[${busId}]} ) % busId )) -eq 0 ]]; then
+      debug "BusID ${busId} has correct time offset at t=${t}"
+      incr=$( lcm ${incr} ${busId} )
+      debug "New increment set to ${incr}."
+      break
+    fi
+    t=$((t+incr))
+    x=$((x+1))
+  done
+done
+
+debug "Total loop iterations: ${x}"
+echo "Pattern correct at t=${t}"
+
+
