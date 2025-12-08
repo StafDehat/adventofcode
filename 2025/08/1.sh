@@ -1,91 +1,30 @@
 #!/bin/bash
 
-input=$( cat "${1}" )
-
-boxDir=$( mktemp -p /dev/shm -d )
+boxDir=$( mktemp -d )
+sortedSpans=$( sort -n "${1}" )
 cd "${boxDir}"
-
-declare -a boxes
-while read x y z; do
-  mkdir -p "${boxDir}"/"${#boxes[@]}"/{spans,links}
-  echo "${x} ${y} ${z}" > "${boxDir}"/"${#boxes[@]}"/coords
-  boxes[${#boxes[@]}]="${x} ${y} ${z}"
-done <<<"${input//,/ }"
-
-function getSpan() {
-  local xA="${1}"
-  local yA="${2}"
-  local zA="${3}"
-  local xB="${4}"
-  local yB="${5}"
-  local zB="${6}"
-  local xDiff=$(( xA-xB ))
-  local yDiff=$(( yA-yB ))
-  local zDiff=$(( zA-zB ))
-  bc -l <<<"scale=2; sqrt( ${xDiff#-}^2 + ${yDiff#-}^2 + ${zDiff#-}^2 )"
-}
-
-# Calculate distance between all points
-for boxA in $( seq 0 $((${#boxes[@]}-1)) ); do
-  echo "$(date +'%F_%T') Calculating distances for box ${boxA}"
-  for boxB in $( seq $((boxA+1)) $((${#boxes[@]}-1)) ); do
-    distance=$( getSpan ${boxes[${boxA}]} \
-                        ${boxes[${boxB}]} )
-    ( #Subshell - preserve pwd
-      cd "${boxDir}"/"${boxA}"/spans
-      ln -s ../../"${boxB}" "${distance}"
-      cd "${boxDir}"/"${boxB}"/spans
-      ln -s ../../"${boxA}" "${distance}"
-    )
-  done
-done
-
-
-# Build our "data structure" by adding links between boxes
-cd "${boxDir}"
-sortedSpans=$( find */spans -type l | sort -t / -nk 3 )
+mkdir "${boxDir}"/sets
+numSets=0
 for i in {1..1000}; do
   echo "$(date +'%F_%T') Creating link number ${i} of 1000"
   # Grab the i-closest pair
-  closest=$( head -n $((i*2)) <<<"${sortedSpans}" | tail -n 2 )
-  read boxA boxB <<<$( cut -d/ -f1 <<<"${closest}" | xargs echo )
+  read distance boxA boxB <<<$( head -n ${i} <<<"${sortedSpans}" | tail -n 1 )
 
-  # If we can traverse from ${boxA}/links to ${boxB}, then they're already
-  #   connected somehow.  Let 'find' figure out the paths.
-  isLinked=$( 
-    find -L "${boxA}" -name spans -prune -o \
-                      -name "${boxB}" 2>/dev/null | grep -cv spans
-  )
-  if [[ ${isLinked} -gt 0 ]]; then
-    continue
-  fi
-
-  # Add the link
-  ( #Subshell - preserve pwd
-    cd "${boxDir}"/"${boxA}"/links && ln -s ../../"${boxB}"
-    cd "${boxDir}"/"${boxB}"/links && ln -s ../../"${boxA}"
-  )
-done
-
-# Build "sets"
-mkdir "${boxDir}"/sets
-numSets=0
-for boxNum in $( seq 0 $((${#boxes[@]}-1)) ); do
-  echo "$(date +'%F_%T') Building initial set for box ${boxNum}"
   # Check to see if I'm already in any sets
-  mySet=$( printf '%s\n' sets/*/"${boxNum}" 2>/dev/null |
-             head -n 1 | cut -d/ -f2 )
-  if [[ "${mySet}" == "*" ]]; then
-    # Make a new set
-    mySet="${numSets}"
+  aSet=$( printf '%s\n' sets/*/"${boxA}" 2>/dev/null |
+            head -n 1 | cut -d/ -f2 )
+  bSet=$( printf '%s\n' sets/*/"${boxB}" 2>/dev/null |
+            head -n 1 | cut -d/ -f2 )
+  if [[ "${aSet}" != "*" ]]; then
+    touch sets/${aSet}/${boxB}
+  elif [[ "${bSet}" != "*" ]]; then
+    touch sets/${bSet}/${boxA}
+  else
+    # Neither node is already in a set - make a new set
+    mkdir sets/${numSets}
+    touch sets/${numSets}/{${boxA},${boxB}}
     numSets=$(( numSets+1 ))
-    mkdir "${boxDir}"/sets/"${mySet}"
-    touch "${boxDir}"/sets/"${mySet}"/"${boxNum}"
   fi
-  # Add all your neighbours to the set too
-  for x in $( printf '%s\n' "${boxNum}"/links/* | cut -d/ -f3 | grep -P '\d+' ); do
-    touch "${boxDir}"/sets/"${mySet}"/"${x}"
-  done
 done
 
 # Now de-dupe the sets
