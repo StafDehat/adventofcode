@@ -8,6 +8,7 @@ while read LINE; do
   reds[${#reds[@]}]="${LINE}"
 done <<<"${input}"
 
+
 function area() {
   local ax ay bx by
   local dx dy
@@ -18,43 +19,127 @@ function area() {
   echo $(( (${dx#-}+1) * (${dy#-}+1) ))
 }
 
+function isOrdered() {
+  [[ ${1} -le ${2} ]] && return 0
+  return 1
+}
+
+#
+# Store horizontal & vertical lines in separate arrays
+declare -a hLines
+declare -a vLines
+# Function takes 2 points & adds a line to the proper array
+# Line format: 4,2-7  or 2-6,8
+function genLine() {
+  local ix iy jx jy
+  read ix iy <<<"${1/,/ }"
+  read jx jy <<<"${2/,/ }"
+  local lo hi
+  if [[ ${ix} -eq ${jx} ]]; then
+    # Vertical line
+    if isOrdered ${iy} ${jy}; then
+      lo=${iy}; hi=${jy}
+    else
+      lo=${jy}; hi=${iy}
+    fi
+    vLines[${#vLines[@]}]="${ix},${lo}-${hi}"
+  else
+    # Horizontal
+    if isOrdered ${ix} ${jx}; then
+      lo=${ix}; hi=${jx}
+    else
+      lo=${jx}; hi=${ix}
+    fi
+    hLines[${#hLines[@]}]="${lo}-${hi},${iy}"
+  fi
+}
+for k in $( seq 0 $((${#reds[@]}-2)) ); do
+  genLine ${reds[${k}]} ${reds[$((k+1))]}
+done
+genLine ${reds[0]} ${reds[$((${#reds[@]}-1))]}
+# End line generation
+#
+
 function isInvalid() {
   local ix iy jx jy
   read ix iy <<<"${1/,/ }"
   read jx jy <<<"${2/,/ }"
-  for k in $( seq 0 $((${#reds[@]}-1)) ); do
-    # Are any other points $k between $i & $j?  That would invalidate $j.
-    read kx ky <<<"${reds[${k}]/,/ }"
-    [[ ${kx} -lt ${ix} ]] && return 1
-    [[ ${ky} -lt ${iy} ]] && return 1
-    [[ ${kx} -gt ${jx} ]] && return 1
-    [[ ${ky} -gt ${jy} ]] && return 1
-    # $j is still a candidate
-    echo "Point ${kx},${ky} is within ${ix},${iy}:${jx},${jy} - invalid"
-    return 0
+  local ytop ybot xl xr
+  if isOrdered ${iy} ${jy}; then
+    ytop=${iy}; ybot=${jy}
+  else
+    ytop=${jy}; ybot=${iy}
+  fi
+  if isOrdered ${ix} ${jx}; then
+    xl=${ix}; xr=${jx}
+  else
+    xl=${jx}; xr=${ix}
+  fi
+  # Test vertical lines for intersection of top/bottom edge
+  for line in ${vLines[@]}; do
+    # If line is L or R of box, we can short-circuit
+    read x y <<<${line/,/ }
+    [[ ${x} -le ${xl} ]] && continue # Vertical line left of box
+    [[ ${x} -ge ${xr} ]] && continue # Vertical line right of box
+    # Line is above/below box - see if it intersects
+    read y1 y2 <<<${y/-/ }
+    if [[ ${y1} -le ${ytop} ]]; then
+      if [[ ${y2} -gt ${ytop} ]]; then
+        #echo "Line ${line} intersects top edge (${ytop}) of box ${ix},${iy}:${jx},${jy}" >&2
+        return 0 # Intersects top edge
+      fi
+      continue # Line stays above box
+    fi
+    if [[ ${y2} -ge ${ybot} ]]; then
+      if [[ ${y1} -lt ${ybot} ]]; then
+        #echo "Line ${line} intersects top edge (${ytop}) of box ${ix},${iy}:${jx},${jy}" >&2
+        return 0 # Intersects bottom edge
+      fi
+      continue # Line stays below box
+    fi
   done
+  # Test horizontal lines for intersection of right/left edge
+  for line in ${hLines[@]}; do
+    read x y <<<${line/,/ }
+    [[ ${y} -le ${ytop} ]] && continue # Horizontal line above the box
+    [[ ${y} -ge ${ybot} ]] && continue # Horizontal line under the box
+    # Line is abouts the box - see if it intersects
+    read x1 x2 <<<${x/-/ }
+    if [[ ${x1} -le ${xl} ]]; then
+      if [[ ${x2} -gt ${xl} ]]; then 
+        #echo "Line ${line} intersects left edge (${xl}) of box ${ix},${iy}:${jx},${jy}" >&2
+        return 0 # Intersects left edge
+      fi
+      continue # Line stays left of box
+    fi
+    if [[ ${x2} -ge ${xr} ]]; then
+      if [[ ${x1} -lt ${xr} ]]; then
+        #echo "Line ${line} intersects right edge (${xr}) of box ${ix},${iy}:${jx},${jy}" >&2
+        return 0 # Intersects right edge
+      fi
+      continue # Line stays right of box
+    fi
+  done
+  # Not invalid, I guess.
+  return 1
 }
 
-# For each red tile, traverse the list to find the largest-possible green box you can make
-# Opposite corner needs to be red too
-# Only need to test boxes stretching from ${i} to down/right
+
+
+# For every pair of points, check if the subsequent box would be invalid
+# Invalid boxes have an edge intersected by a line (hLines,vLines)
 for i in $( seq 0 $((${#reds[@]}-1)) ); do
-  echo "Checking for boxes with ${reds[${i}]} in top-left"
-  # What's the largest green area I can form using ${i} as the top-left corner?
-  read ix iy <<<"${reds[${i}]/,/ }"
-  for j in $( seq 0 $((${#reds[@]}-1)) ); do
-    # Don't test a red tile against itself
-    [[ ${i} -eq ${j} ]] && continue
-
-    # Any point above or left of me, I don't care
-    read jx jy <<<"${reds[${j}]/,/ }"
-    [[ ${jx} -lt ${ix} ]] && continue
-    [[ ${jy} -lt ${iy} ]] && continue
-
+  echo "$(date +'%F_%T') Testing point ${i} of ${#reds[@]} against all remaining points" >&2
+  #read ix iy <<<"${reds[${i}]/,/ }"
+  for j in $( seq $((i+1)) $((${#reds[@]}-1)) ); do
+    #read jx jy <<<"${reds[${j}]/,/ }"
     # Check to see if this pair is invalid due to other points within the area
-    isInvalid ${reds[${i}]} ${reds[${j}]} && continue
-    echo "$(area ${reds[${i}]} ${reds[${j}]}) ${reds[${i}]} ${reds[${j}]}"
+    #echo "Testing box ${reds[${i}]}:${reds[${j}]}" >&2
+    if isInvalid ${reds[${i}]} ${reds[${j}]}; then
+      continue
+    fi
+    echo "$(area ${reds[${i}]} ${reds[${j}]}) ${reds[${i}]}:${reds[${j}]}"
   done
-done
+done | sort -n | tail -n 1
 
 
