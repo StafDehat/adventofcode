@@ -20,7 +20,8 @@ function area() {
 
 for i in $( seq 0 $((${#reds[@]}-1)) ); do
   for j in $( seq $((i+1)) $((${#reds[@]}-1)) ); do
-    area ${reds[${i}]} ${reds[${j}]}
+    area=$( area ${reds[${i}]} ${reds[${j}]} )
+    echo "${area} ${reds[${i}]} ${reds[${j}]}"
   done
 done | sort -n | tail -n 1
 
