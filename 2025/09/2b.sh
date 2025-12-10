@@ -42,6 +42,7 @@ function genLine() {
     else
       lo=${jy}; hi=${iy}
     fi
+    #vLines[${#vLines[@]}]="$((hi-lo)) ${ix},${lo}-${hi}"
     vLines[${#vLines[@]}]="${ix},${lo}-${hi}"
   else
     # Horizontal
@@ -50,6 +51,7 @@ function genLine() {
     else
       lo=${jx}; hi=${ix}
     fi
+    #hLines[${#hLines[@]}]="$((hi-lo)) ${lo}-${hi},${iy}"
     hLines[${#hLines[@]}]="${lo}-${hi},${iy}"
   fi
 }
@@ -58,7 +60,9 @@ for k in $( seq 0 $((${#reds[@]}-2)) ); do
 done
 genLine ${reds[0]} ${reds[$((${#reds[@]}-1))]}
 # Now sort each array by line-length
-
+IFS=$'\n' hLines=( $(sort <<<"${hLines[*]}") )
+IFS=$'\n' vLines=( $(sort <<<"${vLines[*]}") )
+unset IFS
 # End line generation
 #
 
