@@ -33,11 +33,11 @@ while read LINE; do
   push 0 ${goal} 0 ${buttons[@]}
   # BFS
   while true; do
-    read numPushes goal panel else < <(pop)
+    read numPushes goal panel other < <(pop)
     unset buttons
-    buttons=( ${else} )
+    buttons=( ${other} )
     if [[ ${panel} -eq ${goal} ]]; then
-      echo "Solved.  Unpressed buttons: ${else}" >&2
+      echo "Solved.  Unpressed buttons: ${other}" >&2
       echo ${numPushes}  # Print solution
       break
     fi

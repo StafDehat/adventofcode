@@ -18,6 +18,7 @@ while read LINE; do
   tmp=$( grep -Po '\[.*\]' <<<"${LINE}" | tr -d '[]' | tr '\.#' '01' ) # Make binary
   digits=$(($(wc -c <<<"${tmp}")-1))
   goal=$(( 2#${tmp} )) # Convert to decimal
+  echo "$( grep -Po '\[.*\]' <<<"${LINE}" ) == ${tmp} (${goal})" >&2
   # Convert buttons into decimal bitmasks:
   for button in $( grep -Po '\([^\)]*\)' <<<"${LINE}" ); do
     unset binNum
@@ -26,6 +27,7 @@ while read LINE; do
       [[ "${button}" =~ ${i} ]] && binNum="${binNum}1" || binNum="${binNum}0"
     done
     buttons[${#buttons[@]}]=$((2#${binNum}))
+    echo "${button} == ${binNum} ($((2#${binNum})))" >&2
   done
 
   # Initialize the queue
@@ -33,11 +35,11 @@ while read LINE; do
   push 0 ${goal} 0 ${buttons[@]}
   # BFS
   while true; do
-    read numPushes goal panel rest < <(pop)
+    read numPushes goal panel other < <(pop)
     unset buttons
-    buttons=( ${rest} )
+    buttons=( ${other} )
     if [[ ${panel} -eq ${goal} ]]; then
-      echo "Solved.  Unpressed buttons: ${rest}" >&2
+      echo "Solved.  Unpressed buttons: ${other}" >&2
       echo ${numPushes}  # Print solution
       break
     fi
