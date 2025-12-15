@@ -67,69 +67,29 @@ def getButton(digits, txt):
       bitStr+="0"
   return int(bitStr,2)
 
-
-def solve(goal, buttons):
-  # Already solved?
-  if all(x==0 for x in goal):
-    return 0
-  # Impossible?
-  if any(x<0 for x in goal):
-    return 999999
-
-  digits=len(goal)
-  # Make "panel" from the odd numbers in the goal
-  tmp=''.join(['0' if x%2==0 else '1' for x in goal])
-  oddMask=int(tmp,2)
-  #print("Odds: %s (%s)" % (oddMask,tmp))
-
-  #print("Buttons:")
-  #print(buttons)
-
-  # Solve 1 step
-  solves=[999999]
-  #print("Solutions to %s" % (tmp))
-  #for solution in solutions(oddMask,buttons):
-  #  print(solution)
-  for solution in solutions(oddMask,buttons):
-    #print("Assessing solution:")
-    #print(solution)
-
-    deductions=[list(format(x,"0"+str(digits)+"b")) for x in solution]
-    deductions=[list(map(int,x)) for x in deductions]
-    deductions=[sum(x) for x in zip(*deductions)]
-    #print("Deductions:")
-    #print(list(deductions))
-
-    #print("Even leftovers:")
-    #print([int((x-int(y))) for x,y in zip(goal,deductions)])
-
-    newGoal=[int((x-int(y))/2) for x,y in zip(goal,deductions)]
-    #print("New goal")
-    #print(newGoal)
-
-    solves.append(len(solution) + ( 2 * solve(newGoal, buttons) ))
-
-  return min(solves)
-
-
 #
 # The Meat
 total=0
 for line in lines:
   # Convert 'goal' to decimal-represented bitStr
-  goal = list(map(int,line[line.find('{'):-1].replace("{","").split(",")))
-  print("Goal:   %s" % (goal))
+  tmp = line[1:line.find(']')].replace('.','0').replace('#','1')
+  goal = int(tmp,2)
+  print("Goal:   %s (%s)" % (tmp, goal))
 
   # Convert buttons to decimal-represented bitStrs
-  digits = len(goal)
+  digits = len(tmp)
   buttons = list()
   for txt in line.split()[1:-1]:
     buttons.append(getButton(digits,txt))
 
   # Solve
-  result=solve(goal,buttons)
-  print("Solved in %s presses" % (result))
-  total+=result
+  combos=solutions(goal, buttons)
+  print("All solutions:")
+  print(combos)
+
+  print("Best solution:")
+  print(min([len(x) for x in combos]))
+  total+=min([len(x) for x in combos])
 
 print(total)
 
