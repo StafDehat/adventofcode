@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
   
 import sys
-import itertools
 
 # Debug function
 def debug(output):
@@ -33,31 +32,21 @@ def print_r(lst):
     print(row)
 #end print_r()
 
-# True if pressing every 'buttons' solves goal
-def isSolution(goal, buttons):
-  result = 0
-  for button in buttons:
-    result=result^button
-  if ( result == goal ):
-    return True
-  return False
+def solve(goal, buttons):
+  queue = []
+  queue.append( (0, goal, 0, buttons) )
+  while True:
+    next=queue.pop(0)
+    numPushes=next[0]
+    goal=next[1]
+    panel=next[2]
+    buttons=next[3]
+    if ( panel == goal ):
+      print(numPushes)
+      return numPushes
+    for button in buttons:
+      queue.append( ( numPushes+1, goal, panel^button, [x for x in buttons if x != button] ) )
 
-# Return a list of all possible combinations of >1 button(s)
-def combinations(buttons):
-  result = []
-  for x in range(1,len(buttons)+1):
-    result.extend(list(itertools.combinations(buttons,x)))
-  return result
-
-# Get all possible solutions to goal, not just the fewest pushes
-def solutions(goal, buttons):
-  result = []
-  for attempt in combinations(buttons):
-    if isSolution(goal,attempt):
-      result.append(attempt)
-  return result
-
-# Binarify a button string
 def getButton(digits, txt):
   bitStr = ""
   for x in range(digits):
@@ -69,7 +58,7 @@ def getButton(digits, txt):
 
 #
 # The Meat
-total=0
+sum=0
 for line in lines:
   # Convert 'goal' to decimal-represented bitStr
   tmp = line[1:line.find(']')].replace('.','0').replace('#','1')
@@ -83,15 +72,9 @@ for line in lines:
     buttons.append(getButton(digits,txt))
 
   # Solve
-  combos=solutions(goal, buttons)
-  print("All solutions:")
-  print(combos)
+  sum+=solve(goal, buttons)
 
-  print("Best solution:")
-  print(min([len(x) for x in combos]))
-  total+=min([len(x) for x in combos])
-
-print(total)
+print(sum)
 
 
 
