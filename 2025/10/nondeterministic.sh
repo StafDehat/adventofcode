@@ -2,6 +2,20 @@
 
 input=$( cat "${1}" )
 
+# File-based queue
+queueFile="tmpfile"
+touch ${queueFile}
+function push() {
+  #echo "Pushing: ${@}" >&2
+  echo "${@}" >> "${queueFile}"
+}
+function pop() {
+  #echo "Popping: $(head -n 1 "${queueFile}")" >&2
+  local line=$( head -n 1 "${queueFile}" )
+  sed -i '1d' "${queueFile}"
+  echo "${line}"
+}
+
 while read LINE; do
   unset goal buttons
   # Convert light-panel goal into a decimal bitmask:
@@ -17,20 +31,17 @@ while read LINE; do
       [[ "${button}" =~ ${i} ]] && binNum="${binNum}1" || binNum="${binNum}0"
     done
     buttons[${#buttons[@]}]=$((2#${binNum}))
-    #echo "${button} == ${binNum} ($((2#${binNum})))" >&2
+    echo "${button} == ${binNum} ($((2#${binNum})))" >&2
   done
 
   # Initialize the queue
-  unset queue
-  declare -a queue
-  queue[0]="0 0 ${buttons[@]}"
-  qptr=0
-  #echo "Pushing initial state to queue: 0 0 ${buttons[@]}" >&2
+  >"${queueFile}"
+  push 0 ${goal} 0 ${buttons[@]}
+  echo "Pushing initial state to queue: 0 ${goal} 0 ${buttons[@]}" >&2
   # BFS
   while true; do
-    read numPushes panel other <<<"${queue[${qptr}]}"
-    qptr=$((qptr+1))
-    #echo "Popped: ${numPushes} ${panel} ${other}" >&2
+    read numPushes goal panel other < <(pop)
+    #echo "Popped: ${numPushes} ${goal} ${panel} ${other}" >&2
     unset buttons
     buttons=( ${other} )
     if [[ ${panel} -eq ${goal} ]]; then
@@ -38,11 +49,12 @@ while read LINE; do
       echo ${numPushes}  # Print solution
       break
     fi
-    for i in ${!buttons[@]}; do
+    for i in $( seq 0 $((${#buttons[@]}-1)) ); do
       button=${buttons[${i}]}
-      others=( "${buttons[@]:0:i}" "${buttons[@]:i+1}" )
-      # Push
-      queue[${#queue[@]}]="$((numPushes+1)) $((${panel}^${button})) ${others[@]}"
+      other=$( echo ${buttons[@]} | sed 's/\(\s\|^\)'${button}'\(\s\|$\)/ /' )
+      push $((numPushes+1)) ${goal} $((${panel}^${button})) ${other# }
+      #echo "Pushed: $((numPushes+1)) ${goal} $((panel^button)) ${buttons[@]}" >&2
+      #buttons[${i}]=${button}
     done
   done
 done <<<"${input}" | paste -sd+ | bc

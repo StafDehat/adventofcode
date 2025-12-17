@@ -33,6 +33,17 @@ def print_r(lst):
     print(row)
 #end print_r()
 
+# Input: 5, 4
+# Output: [ 0, 1, 0, 1 ]
+def int2bitlist(num, digits):
+  return list(map(int,list(format(num,"0"+str(digits)+"b"))))
+
+# Input: (38, 59), 6
+# Output: [2, 1, 1, 1, 2, 1]
+def getDeductions(buttons, digits):
+  return [sum(x) for x in zip(*[int2bitlist(x,digits) for x in buttons])]
+
+
 # True if pressing every 'buttons' solves goal
 def isSolution(goal, buttons):
   result = 0
@@ -50,7 +61,7 @@ def combinations(buttons):
   return result
 
 # Get all possible solutions to goal, not just the fewest pushes
-def solutions(goal, buttons):
+def getSolutions(goal, buttons):
   result = []
   for attempt in combinations(buttons):
     if isSolution(goal,attempt):
@@ -73,39 +84,59 @@ def solve(goal, buttons):
   if all(x==0 for x in goal):
     return 0
   # Impossible?
-  if any(x<0 for x in goal):
+  if min(goal) < 0:
     return 999999
+
+
+#Assessing solution:
+#(62, 59, 24)
+#Deductions:
+#[2, 3, 3, 1, 2, 1]
+#Even leftovers:
+#[8, 8, 8, 4, 8, 4]
+#New goal
+#[4, 4, 4, 2, 4, 2]
+#Odds: 0 (000000)
+
+
+# If they're all even, push none & halve?
+
 
   digits=len(goal)
   # Make "panel" from the odd numbers in the goal
   tmp=''.join(['0' if x%2==0 else '1' for x in goal])
   oddMask=int(tmp,2)
-  #print("Odds: %s (%s)" % (oddMask,tmp))
+  print("Odds: %s (%s)" % (oddMask,tmp))
 
-  #print("Buttons:")
-  #print(buttons)
+  print("Buttons:")
+  print(buttons)
 
   # Solve 1 step
   solves=[999999]
-  #print("Solutions to %s" % (tmp))
-  #for solution in solutions(oddMask,buttons):
-  #  print(solution)
-  for solution in solutions(oddMask,buttons):
-    #print("Assessing solution:")
-    #print(solution)
+  print("Solutions to %s" % (tmp))
+  solutions = getSolutions(oddMask,buttons)
+  if len(solutions) < 1:
+    return 999999
+  for solution in solutions:
+    print(solution)
+  for solution in solutions:
+    print("Assessing solution:")
+    print(solution)
 
-    deductions=[list(format(x,"0"+str(digits)+"b")) for x in solution]
-    deductions=[list(map(int,x)) for x in deductions]
-    deductions=[sum(x) for x in zip(*deductions)]
-    #print("Deductions:")
-    #print(list(deductions))
+    deductions=getDeductions(solution,digits)
+    print("Deductions:")
+    print(list(deductions))
 
-    #print("Even leftovers:")
-    #print([int((x-int(y))) for x,y in zip(goal,deductions)])
+    print("Even leftovers:")
+    print([int((x-int(y))) for x,y in zip(goal,deductions)])
 
     newGoal=[int((x-int(y))/2) for x,y in zip(goal,deductions)]
-    #print("New goal")
-    #print(newGoal)
+    print("New goal")
+    print(newGoal)
+
+    # Redundant, I think, due to the negative check already above
+    if any(i > j for i, j in zip(deductions, goal)):
+      return 999999
 
     solves.append(len(solution) + ( 2 * solve(newGoal, buttons) ))
 

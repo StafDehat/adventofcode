@@ -10,6 +10,11 @@ binSol=[list(map(int,x)) for x in binSol]
 print([sum(x) for x in zip(*binSol)])
 
 
+def int2bitlist(num, digits):
+  return list(map(int,list(format(num,"0"+str(digits)+"b"))))
+
+print(int2bitlist(5,4))
+
 
 #zip([list(format(x,"0"+str(digits)+"b")) for x in solution])
 
